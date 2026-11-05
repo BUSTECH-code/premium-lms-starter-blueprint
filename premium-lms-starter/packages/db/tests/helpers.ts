@@ -46,8 +46,8 @@ export async function insertCourse(
 ): Promise<{ id: string; slug: string }> {
   const slug = overrides.slug ?? `course-${Math.random().toString(36).slice(2, 10)}`;
   const { rows } = await db.query<{ id: string; slug: string }>(
-    `INSERT INTO courses (slug, title, created_by, status, published_at)
-     VALUES ($1, 'Test Course', $2, $3, $4) RETURNING id, slug`,
+    `INSERT INTO courses (slug, title, created_by, status, published_at, price_amount, price_currency)
+     VALUES ($1, 'Test Course', $2, $3, $4, '100.00', 'NGN') RETURNING id, slug`,
     [
       slug,
       createdBy,

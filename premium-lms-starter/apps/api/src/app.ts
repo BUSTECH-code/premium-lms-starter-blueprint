@@ -1,9 +1,11 @@
 import cookieParser from 'cookie-parser';
-import express, { type Express } from 'express';
+import express, { type Express, type Request } from 'express';
 import type { DbClient } from '@lms/db';
 import { createAdminRouter } from './admin/routes.js';
 import { createAuthRouter } from './auth/routes.js';
 import { SlidingWindowRateLimiter } from './auth/rate-limit.js';
+import { createCatalogRouter } from './catalog/routes.js';
+import { createCommerceRouter } from './commerce/routes.js';
 import type { Env } from './config/env.js';
 import type { Logger } from './lib/logger.js';
 import { errorHandler, notFoundHandler } from './middleware/error-handler.js';
@@ -28,7 +30,16 @@ export function createApp({ env, db, logger }: AppDependencies): Express {
 
   app.use(securityHeaders(env));
   app.use(cors(env));
-  app.use(express.json({ limit: '100kb' }));
+  // Capture the exact raw bytes for webhook HMAC verification while still
+  // exposing a parsed body to routes.
+  app.use(
+    express.json({
+      limit: '100kb',
+      verify: (req, _res, buf) => {
+        (req as Request & { rawBody?: Buffer }).rawBody = buf;
+      },
+    }),
+  );
   app.use(cookieParser());
   app.use(requestLogger(logger));
   app.use(originCheck(env));
@@ -50,10 +61,19 @@ export function createApp({ env, db, logger }: AppDependencies): Express {
       env.rateLimit.register.maxAttempts,
       env.rateLimit.register.windowSeconds,
     ),
+    checkout: new SlidingWindowRateLimiter(
+      env.rateLimit.checkout.maxAttempts,
+      env.rateLimit.checkout.windowSeconds,
+    ),
   };
 
   app.use('/api/auth', createAuthRouter({ env, db, logger, limiters }));
   app.use('/api/admin', createAdminRouter({ env, db, logger }));
+  app.use('/api', createCatalogRouter({ env, db }));
+  app.use(
+    '/api',
+    createCommerceRouter({ env, db, logger, checkoutLimiter: limiters.checkout }),
+  );
 
   app.use(notFoundHandler);
   app.use(errorHandler(logger));

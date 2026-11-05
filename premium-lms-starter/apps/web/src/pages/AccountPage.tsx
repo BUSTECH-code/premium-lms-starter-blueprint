@@ -1,15 +1,43 @@
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { ApiError, apiFetch } from '../auth/api.js';
 import { useAuth } from '../auth/AuthProvider.js';
 import { can } from '../auth/permissions.js';
-import { Badge, Button } from '../components/ui.js';
+import { Alert, Badge, Button, Spinner } from '../components/ui.js';
+import { formatDate } from '../lib/format.js';
 
-/**
- * Foundation account page: shows the authenticated session, roles and
- * permissions. Course/library content arrives with later phases — this page
- * deliberately shows only real, verified data.
- */
+interface EnrollmentItem {
+  enrollmentId: string;
+  course: { id: string; slug: string; title: string; status: string; href: string };
+  status: string;
+  enrolledAt: string;
+  completedAt: string | null;
+}
+
+/** Account page: session info plus the learner's enrolled courses library. */
 export function AccountPage() {
   const { user, logout } = useAuth();
+  const [enrollments, setEnrollments] = useState<EnrollmentItem[] | null>(null);
+  const [libraryError, setLibraryError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const result = await apiFetch<{ items: EnrollmentItem[] }>('/api/me/enrollments');
+        if (!cancelled) setEnrollments(result.items);
+      } catch (err) {
+        if (!cancelled) {
+          setLibraryError(err instanceof ApiError ? err.message : 'Could not load your courses.');
+          setEnrollments([]);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   if (!user) return null;
 
   return (
@@ -23,6 +51,37 @@ export function AccountPage() {
           Sign out
         </Button>
       </header>
+
+      <section className="panel">
+        <h2>Your courses</h2>
+        {enrollments === null ? (
+          <Spinner label="Loading your courses…" />
+        ) : libraryError ? (
+          <Alert>{libraryError}</Alert>
+        ) : enrollments.length === 0 ? (
+          <div className="empty-state">
+            <p className="muted">You are not enrolled in any courses yet.</p>
+            <Link className="button secondary" to="/courses">
+              Browse the catalogue
+            </Link>
+          </div>
+        ) : (
+          <ul className="enrollment-list">
+            {enrollments.map((item) => (
+              <li key={item.enrollmentId} className="enrollment-row">
+                <div>
+                  <Link to={item.course.href}>{item.course.title}</Link>
+                  <p className="muted">
+                    Enrolled {formatDate(item.enrolledAt)}
+                    {item.course.status === 'withdrawn' ? ' · course withdrawn' : ''}
+                  </p>
+                </div>
+                <Badge>{item.status}</Badge>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
 
       <section className="panel">
         <h2>Profile</h2>
@@ -67,11 +126,14 @@ export function AccountPage() {
       </section>
 
       <section className="panel">
-        <h2>Foundation build</h2>
+        <h2>What's live</h2>
         <p className="muted">
-          Course discovery, your library and the learning environment arrive in the next phases.
-          Authentication, roles and the secure session you are using now are live.
+          Catalogue browsing, purchase with the simulated payment provider, automatic enrolment
+          and this library are live. The learning environment arrives with the next phase.
         </p>
+        <Link className="button secondary" to="/courses">
+          Browse the catalogue
+        </Link>
         {can(user, 'users.read') ? (
           <Link className="button secondary" to="/admin">
             Administration

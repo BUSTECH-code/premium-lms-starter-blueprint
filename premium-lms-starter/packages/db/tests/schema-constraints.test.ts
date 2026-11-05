@@ -93,14 +93,16 @@ describe('course structure constraints', () => {
 
     await expectSqlError(
       db.query(
-        `INSERT INTO courses (slug, title, created_by) VALUES ('Bad Slug!', 'Course', $1)`,
+        `INSERT INTO courses (slug, title, created_by, price_amount, price_currency)
+         VALUES ('Bad Slug!', 'Course', $1, '0.00', 'NGN')`,
         [author.id],
       ),
       '23514',
     );
     await expectSqlError(
       db.query(
-        `INSERT INTO courses (slug, title, created_by, status) VALUES ('good-slug', 'Course', $1, 'live')`,
+        `INSERT INTO courses (slug, title, created_by, status, price_amount, price_currency)
+         VALUES ('good-slug', 'Course', $1, 'live', '0.00', 'NGN')`,
         [author.id],
       ),
       '23514',
@@ -108,7 +110,8 @@ describe('course structure constraints', () => {
     // published without a published_at timestamp is not allowed
     await expectSqlError(
       db.query(
-        `INSERT INTO courses (slug, title, created_by, status) VALUES ('pub-course', 'Course', $1, 'published')`,
+        `INSERT INTO courses (slug, title, created_by, status, price_amount, price_currency)
+         VALUES ('pub-course', 'Course', $1, 'published', '0.00', 'NGN')`,
         [author.id],
       ),
       '23514',

@@ -16,7 +16,7 @@ export default defineConfig({
     include: [
       'packages/db/tests/**/*.test.ts',
       'apps/api/tests/**/*.test.ts',
-      'apps/web/src/**/*.test.ts',
+      'apps/web/src/**/*.test.{ts,tsx}',
     ],
     testTimeout: 20_000,
     hookTimeout: 20_000,

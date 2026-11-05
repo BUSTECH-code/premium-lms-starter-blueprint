@@ -38,6 +38,69 @@ describe('parseEnv — development/test defaults', () => {
   });
 });
 
+describe('parseEnv — commerce (Phase 2)', () => {
+  const stagingBase = {
+    NODE_ENV: 'staging',
+    DB_PATH: 'memory:',
+    JWT_SECRET: 'x'.repeat(40),
+    WEB_ORIGIN: 'https://staging.academy.example.com',
+  };
+  const testBase = { NODE_ENV: 'test', DB_PATH: 'memory:' };
+
+  it('enables the simulated provider by default outside production-like envs', () => {
+    const env = parseEnv(testBase);
+    expect(env.commerce.provider).toBe('simulated');
+    expect(env.commerce.simulationEnabled).toBe(true);
+    expect(env.commerce.currency).toBe('NGN');
+    expect(env.commerce.checkoutTtlMinutes).toBe(30);
+    expect(env.commerce.webhookSecret.length).toBeGreaterThanOrEqual(32);
+  });
+
+  it('keeps simulated payments off in production-like envs without explicit opt-in', () => {
+    const env = parseEnv(stagingBase);
+    expect(env.commerce.simulationEnabled).toBe(false);
+    // Even when disabled, a secret exists so config shape is stable.
+    expect(env.commerce.webhookSecret.length).toBeGreaterThanOrEqual(32);
+  });
+
+  it('requires a strong webhook secret to opt in on production-like envs', () => {
+    const optIn = { ...stagingBase, ALLOW_SIMULATED_PAYMENTS: 'true' };
+    expect(() => parseEnv(optIn)).toThrow(/SIMULATED_WEBHOOK_SECRET/);
+    expect(() => parseEnv({ ...optIn, SIMULATED_WEBHOOK_SECRET: 'too-short' })).toThrow(
+      /32 chars/,
+    );
+    expect(() =>
+      parseEnv({
+        ...optIn,
+        SIMULATED_WEBHOOK_SECRET: 'a-placeholder-secret-value-at-least-32ch',
+      }),
+    ).toThrow(/placeholder/i);
+
+    const ok = parseEnv({
+      ...optIn,
+      SIMULATED_WEBHOOK_SECRET: 'stage-simulated-webhook-key-9f3a7c1e5b2d8a4f',
+    });
+    expect(ok.commerce.simulationEnabled).toBe(true);
+    expect(ok.commerce.webhookSecret).toBe('stage-simulated-webhook-key-9f3a7c1e5b2d8a4f');
+  });
+
+  it('validates currency, provider and checkout TTL inputs', () => {
+    expect(() => parseEnv({ ...testBase, STORE_CURRENCY: 'naira' })).toThrow(/STORE_CURRENCY/);
+    expect(() => parseEnv({ ...testBase, PAYMENT_PROVIDER: 'stripe' })).toThrow();
+    expect(() => parseEnv({ ...testBase, CHECKOUT_TTL_MINUTES: '0' })).toThrow();
+    expect(() => parseEnv({ ...testBase, CHECKOUT_TTL_MINUTES: '1441' })).toThrow();
+    expect(parseEnv({ ...testBase, STORE_CURRENCY: 'usd' }).commerce.currency).toBe('USD');
+  });
+
+  it('applies checkout rate-limit defaults and overrides', () => {
+    const env = parseEnv(testBase);
+    expect(env.rateLimit.checkout.maxAttempts).toBe(30);
+    expect(env.rateLimit.checkout.windowSeconds).toBe(300);
+    const overridden = parseEnv({ ...testBase, RATE_LIMIT_CHECKOUT_MAX_ATTEMPTS: '5' });
+    expect(overridden.rateLimit.checkout.maxAttempts).toBe(5);
+  });
+});
+
 describe('parseEnv — staging/production hardening', () => {
   const prodBase = {
     NODE_ENV: 'production',

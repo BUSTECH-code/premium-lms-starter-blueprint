@@ -6,6 +6,7 @@ export interface UserRow {
   password_hash: string;
   password_algorithm: string;
   name: string;
+  bio: string | null;
   status: 'active' | 'suspended';
   email_verified_at: Date | null;
   created_at: Date;
@@ -50,6 +51,9 @@ export interface CourseRow {
   version: number;
   created_by: string;
   published_at: Date | null;
+  price_amount: string;
+  price_currency: string;
+  tags: string[];
   created_at: Date;
   updated_at: Date;
 }
@@ -84,21 +88,24 @@ export interface EnrollmentRow {
   updated_at: Date;
 }
 
+export type OrderStatus =
+  | 'created'
+  | 'payment_pending'
+  | 'paid'
+  | 'failed'
+  | 'cancelled'
+  | 'partially_refunded'
+  | 'refunded'
+  | 'reversed';
+
 export interface OrderRow {
   id: string;
   user_id: string;
-  status:
-    | 'created'
-    | 'payment_pending'
-    | 'paid'
-    | 'failed'
-    | 'cancelled'
-    | 'partially_refunded'
-    | 'refunded'
-    | 'reversed';
+  status: OrderStatus;
   currency: string;
   total_amount: string;
   idempotency_key: string | null;
+  expires_at: Date | null;
   created_at: Date;
   updated_at: Date;
 }
@@ -113,12 +120,21 @@ export interface OrderItemRow {
   created_at: Date;
 }
 
+export type PaymentStatus =
+  | 'initiated'
+  | 'pending'
+  | 'succeeded'
+  | 'failed'
+  | 'expired'
+  | 'reversed'
+  | 'refunded';
+
 export interface PaymentRow {
   id: string;
   order_id: string;
   provider: string;
   provider_reference: string | null;
-  status: 'initiated' | 'pending' | 'succeeded' | 'failed' | 'expired' | 'reversed' | 'refunded';
+  status: PaymentStatus;
   amount: string;
   currency: string;
   processed_at: Date | null;

@@ -94,8 +94,17 @@ export async function login(app: Express, email: string, password = DEFAULT_PASS
 }
 
 export function api(app: Express, jar?: CookieJar) {
-  const req = request(app);
-  return jar ? req.set('Cookie', jar.header()) : req;
+  // supertest's root object only exposes HTTP verbs; the Test returned by a
+  // verb carries .set(). Attach the cookie jar per request.
+  const send = <T extends { set: (field: string, value: string) => unknown }>(req: T): T =>
+    (jar ? (req.set('Cookie', jar.header()) as unknown as T) : req);
+  return {
+    get: (path: string) => send(request(app).get(path)),
+    post: (path: string) => send(request(app).post(path)),
+    put: (path: string) => send(request(app).put(path)),
+    patch: (path: string) => send(request(app).patch(path)),
+    delete: (path: string) => send(request(app).delete(path)),
+  };
 }
 
 /** Replace a user's roles directly in the database (test setup only). */

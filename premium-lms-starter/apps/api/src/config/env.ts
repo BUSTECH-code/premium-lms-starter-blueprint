@@ -33,6 +33,19 @@ const rawSchema = z.object({
   RATE_LIMIT_LOGIN_WINDOW_SECONDS: z.coerce.number().int().min(1).max(86_400).default(600),
   RATE_LIMIT_REGISTER_MAX_ATTEMPTS: z.coerce.number().int().min(1).max(100_000).default(10),
   RATE_LIMIT_REGISTER_WINDOW_SECONDS: z.coerce.number().int().min(1).max(86_400).default(3600),
+  // --- Phase 2: catalogue & commerce ---------------------------------------
+  // Currency is an OPEN decision (O-05/O-21); NGN is a development placeholder.
+  STORE_CURRENCY: z.string().default('NGN'),
+  // The real payment provider is an OPEN decision (O-05). 'simulated' is the
+  // only supported value until a provider is approved; production-like
+  // environments must opt in explicitly with ALLOW_SIMULATED_PAYMENTS=true.
+  PAYMENT_PROVIDER: z.enum(['simulated']).default('simulated'),
+  ALLOW_SIMULATED_PAYMENTS: z.enum(['true', 'false']).default('false'),
+  SIMULATED_WEBHOOK_SECRET: z.string().optional(),
+  // Abandoned-checkout deadline for pending orders.
+  CHECKOUT_TTL_MINUTES: z.coerce.number().int().min(1).max(1440).default(30),
+  RATE_LIMIT_CHECKOUT_MAX_ATTEMPTS: z.coerce.number().int().min(1).max(100_000).default(30),
+  RATE_LIMIT_CHECKOUT_WINDOW_SECONDS: z.coerce.number().int().min(1).max(86_400).default(300),
 });
 
 export interface RateLimitRule {
@@ -59,6 +72,17 @@ export interface Env {
     /** Broader per-IP ceiling that slows password spraying across many accounts. */
     loginPerIp: RateLimitRule;
     register: RateLimitRule;
+    /** Order creation / simulated checkout attempts per user. */
+    checkout: RateLimitRule;
+  };
+  commerce: {
+    /** Store currency (placeholder pending O-05/O-21). */
+    currency: string;
+    provider: 'simulated';
+    /** True when simulated checkout/webhook endpoints are mounted. */
+    simulationEnabled: boolean;
+    webhookSecret: string;
+    checkoutTtlMinutes: number;
   };
   logLevel: 'fatal' | 'error' | 'warn' | 'info' | 'debug' | 'trace' | 'silent';
 }
@@ -179,6 +203,30 @@ export function parseEnv(input: Record<string, string | undefined>): Env {
     windowSeconds: raw.RATE_LIMIT_LOGIN_WINDOW_SECONDS,
   };
 
+  // --- Commerce (Phase 2) ---------------------------------------------------
+  const currency = raw.STORE_CURRENCY.trim().toUpperCase();
+  if (!/^[A-Z]{3}$/.test(currency)) {
+    throw new EnvironmentError('STORE_CURRENCY must be a 3-letter currency code (e.g. NGN).');
+  }
+  const allowSimulated = raw.ALLOW_SIMULATED_PAYMENTS === 'true';
+  const simulationEnabled =
+    raw.PAYMENT_PROVIDER === 'simulated' && (!isProductionLike || allowSimulated);
+
+  let webhookSecret = raw.SIMULATED_WEBHOOK_SECRET?.trim() || undefined;
+  if (simulationEnabled && isProductionLike) {
+    if (!webhookSecret || webhookSecret.length < 32) {
+      throw new EnvironmentError(
+        'SIMULATED_WEBHOOK_SECRET (>= 32 chars) is required when simulated payments are enabled in staging/production.',
+      );
+    }
+    const lowerSecret = webhookSecret.toLowerCase();
+    if (WEAK_SECRET_MARKERS.some((marker) => lowerSecret.includes(marker)) || WEAK_SECRET_EXACT.has(lowerSecret)) {
+      throw new EnvironmentError('SIMULATED_WEBHOOK_SECRET appears to be a placeholder value.');
+    }
+  } else if (!webhookSecret) {
+    webhookSecret = randomBytes(48).toString('base64url');
+  }
+
   return Object.freeze({
     nodeEnv,
     isProductionLike,
@@ -202,6 +250,17 @@ export function parseEnv(input: Record<string, string | undefined>): Env {
         maxAttempts: raw.RATE_LIMIT_REGISTER_MAX_ATTEMPTS,
         windowSeconds: raw.RATE_LIMIT_REGISTER_WINDOW_SECONDS,
       }),
+      checkout: Object.freeze({
+        maxAttempts: raw.RATE_LIMIT_CHECKOUT_MAX_ATTEMPTS,
+        windowSeconds: raw.RATE_LIMIT_CHECKOUT_WINDOW_SECONDS,
+      }),
+    }),
+    commerce: Object.freeze({
+      currency,
+      provider: raw.PAYMENT_PROVIDER,
+      simulationEnabled,
+      webhookSecret,
+      checkoutTtlMinutes: raw.CHECKOUT_TTL_MINUTES,
     }),
     logLevel: raw.LOG_LEVEL,
   });

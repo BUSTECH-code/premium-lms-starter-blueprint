@@ -555,3 +555,282 @@ tbody tr:last-child td {
     align-items: stretch;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   Phase 2 — catalogue, course detail, checkout, library
+   --------------------------------------------------------------------------- */
+
+.lede {
+  font-size: var(--font-size-lg);
+  line-height: var(--line-height-body);
+  max-width: 46rem;
+}
+
+.small-print {
+  font-size: var(--font-size-xs);
+}
+
+.catalogue-filters .inline-form {
+  align-items: flex-end;
+}
+
+.chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--color-line);
+  border-radius: 999px;
+  background: var(--color-surface);
+  color: var(--color-ink);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  transition: border-color var(--duration-fast) var(--ease-standard);
+}
+
+.chip:hover {
+  border-color: var(--color-ink-soft);
+}
+
+.chip.active {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+}
+
+.chip-count {
+  opacity: 0.75;
+  font-variant-numeric: tabular-nums;
+}
+
+.result-count {
+  margin: var(--space-4) 0 var(--space-2);
+  font-size: var(--font-size-sm);
+}
+
+/* Editorial rows — deliberately not a wall of identical cards. */
+.course-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.course-row {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-5);
+  padding: var(--space-5);
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-md);
+}
+
+.course-row-main {
+  min-width: 0;
+}
+
+.course-row-main h2 {
+  font-family: var(--font-display);
+  font-size: var(--font-size-xl);
+  line-height: var(--line-height-tight);
+  margin: var(--space-1) 0 var(--space-2);
+}
+
+.course-row-main h2 a {
+  color: var(--color-ink);
+  text-decoration: none;
+}
+
+.course-row-main h2 a:hover {
+  color: var(--color-accent);
+}
+
+.course-row-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: center;
+  gap: var(--space-3);
+  flex-shrink: 0;
+}
+
+.course-meta {
+  font-size: var(--font-size-sm);
+  margin: var(--space-2) 0;
+}
+
+.price {
+  font-family: var(--font-display);
+  font-size: var(--font-size-xl);
+  color: var(--color-ink);
+  white-space: nowrap;
+}
+
+.tag-badge {
+  border: 1px solid var(--color-line);
+  background: transparent;
+  color: var(--color-ink-soft);
+  cursor: pointer;
+  text-decoration: none;
+  font-size: var(--font-size-xs);
+}
+
+.tag-badge:hover {
+  border-color: var(--color-ink-soft);
+  color: var(--color-ink);
+}
+
+.empty-state {
+  padding: var(--space-5);
+  text-align: center;
+}
+
+.breadcrumb {
+  font-size: var(--font-size-sm);
+  color: var(--color-ink-soft);
+  margin-bottom: var(--space-4);
+}
+
+.breadcrumb a {
+  color: var(--color-accent);
+}
+
+.detail-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 20rem;
+  gap: var(--space-5);
+  align-items: start;
+}
+
+.detail-main h1 {
+  font-family: var(--font-display);
+  font-size: var(--font-size-2xl);
+  line-height: var(--line-height-tight);
+  margin: var(--space-1) 0 var(--space-2);
+}
+
+.curriculum details {
+  border-top: 1px solid var(--color-line);
+}
+
+.curriculum details:last-child {
+  border-bottom: 1px solid var(--color-line);
+}
+
+.curriculum summary {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) 0;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.curriculum ol {
+  list-style: none;
+  padding: 0 0 var(--space-3);
+  margin: 0;
+}
+
+.curriculum li {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-2) 0 var(--space-2) var(--space-4);
+  font-size: var(--font-size-sm);
+  border-left: 2px solid var(--color-line);
+}
+
+.purchase-card {
+  position: sticky;
+  top: var(--space-5);
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-soft);
+  padding: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.purchase-card .price {
+  font-size: var(--font-size-2xl);
+}
+
+.purchase-card .button {
+  width: 100%;
+  text-align: center;
+}
+
+.checkout-page .checkout-summary,
+.checkout-page .success-panel,
+.checkout-page .checkout-actions {
+  max-width: 44rem;
+}
+
+.button-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+}
+
+.success-panel {
+  border-color: var(--color-success);
+  background: var(--color-success-bg);
+}
+
+.enrollment-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.enrollment-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-3) 0;
+  border-top: 1px solid var(--color-line);
+}
+
+.enrollment-row:first-child {
+  border-top: none;
+}
+
+.enrollment-row a {
+  font-weight: 600;
+  color: var(--color-ink);
+  text-decoration: none;
+}
+
+.enrollment-row a:hover {
+  color: var(--color-accent);
+}
+
+@media (max-width: 52rem) {
+  .detail-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .purchase-card {
+    position: static;
+  }
+
+  .course-row {
+    flex-direction: column;
+  }
+
+  .course-row-side {
+    align-items: flex-start;
+  }
+}

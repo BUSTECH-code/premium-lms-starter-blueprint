@@ -5,8 +5,11 @@ import { can } from './auth/permissions.js';
 import { Button, Spinner } from './components/ui.js';
 import { AccountPage } from './pages/AccountPage.js';
 import { AdminPage } from './pages/AdminPage.js';
+import { CatalogPage } from './pages/CatalogPage.js';
+import { CourseDetailPage } from './pages/CourseDetailPage.js';
 import { LoginPage } from './pages/LoginPage.js';
 import { RegisterPage } from './pages/RegisterPage.js';
+import { SimulatedCheckoutPage } from './pages/SimulatedCheckoutPage.js';
 
 function NotFoundPage() {
   const location = useLocation();
@@ -36,6 +39,7 @@ function AppShell() {
           Premium<span>Academy</span>
         </Link>
         <nav aria-label="Main">
+          <NavLink to="/courses">Catalogue</NavLink>
           {status === 'authenticated' ? (
             <>
               <NavLink to="/" end>
@@ -73,8 +77,18 @@ function AppShell() {
               </RequireAuth>
             }
           />
+          <Route path="/courses" element={<CatalogPage />} />
+          <Route path="/courses/:slug" element={<CourseDetailPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
+          <Route
+            path="/checkout/simulated/:reference"
+            element={
+              <RequireAuth>
+                <SimulatedCheckoutPage />
+              </RequireAuth>
+            }
+          />
           <Route
             path="/admin"
             element={
@@ -90,7 +104,7 @@ function AppShell() {
       </main>
 
       <footer className="app-footer">
-        <span className="muted">Premium Academy — foundation build (Phase 1)</span>
+        <span className="muted">Premium Academy — catalogue &amp; commerce (Phase 2)</span>
       </footer>
     </div>
   );

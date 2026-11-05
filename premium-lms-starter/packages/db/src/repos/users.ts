@@ -30,7 +30,7 @@ export interface UserListItem extends ListedUserRow {
   roles: string[];
 }
 
-const USER_COLUMNS = `id, email, password_hash, password_algorithm, name, status,
+const USER_COLUMNS = `id, email, password_hash, password_algorithm, name, bio, status,
   email_verified_at, created_at, updated_at`;
 
 export async function createUser(db: DbClient, input: CreateUserInput): Promise<UserRow> {
@@ -122,7 +122,7 @@ export async function listUsers(
   );
   // Password material is never selected here — listings are not a credential source.
   const { rows } = await db.query<ListedUserRow & { roles: string | null }>(
-    `SELECT u.id, u.email, u.name, u.status, u.email_verified_at, u.created_at, u.updated_at,
+    `SELECT u.id, u.email, u.name, u.bio, u.status, u.email_verified_at, u.created_at, u.updated_at,
             (SELECT string_agg(ur.role_key, ',' ORDER BY ur.role_key)
                FROM user_roles ur WHERE ur.user_id = u.id) AS roles
        FROM users u

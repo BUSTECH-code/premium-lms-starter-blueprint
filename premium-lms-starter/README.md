@@ -12,7 +12,8 @@ services are future capabilities, not launch requirements.
 |---|---|---|
 | Phase 0 | Discovery and decisions | Open product decisions remain listed in `docs/product/open-requirements.md` |
 | **Phase 1** | **Foundation: monorepo, environments, database + migrations, authentication, RBAC, automated checks** | **Implemented (see `docs/implementation/phase-1-foundation.md`)** |
-| Phase 2+ | Public site, catalogue, commerce, learning, mobile, operations | Not started |
+| **Phase 2** | **Catalogue, purchase & enrolment (simulated gateway), learner library** | **Implemented (see `docs/implementation/phase-2-catalog-purchase-enrolment.md`)** |
+| Phase 3+ | Public site polish, learning environment, mobile, operations | Not started |
 
 ## Repository map
 
@@ -22,12 +23,12 @@ services are future capabilities, not launch requirements.
 - `docs/workflows/` — key business and learner workflows.
 - `docs/design/` — premium visual direction, design principles, visual acceptance criteria and references.
 - `docs/security/` — security, content protection, devices and offline-learning principles.
-- `docs/implementation/` — delivery phases, task rules, verification strategy and the Phase 1 build log.
+- `docs/implementation/` — delivery phases, task rules, verification strategy and the Phase 1/Phase 2 build logs.
 - `apps/api/` — backend API (Express 5 + TypeScript): authentication, RBAC, admin endpoints.
 - `apps/web/` — web application (React 19 + Vite): auth flows, guarded routes, admin console.
 - `packages/db/` — database package: PGlite client, SQL migrations, RBAC seed, repositories.
 
-## Architecture (Phase 1)
+## Architecture (Phases 1–2)
 
 Modular monolith with a shared backend API, per `docs/architecture/system-architecture.md`:
 
