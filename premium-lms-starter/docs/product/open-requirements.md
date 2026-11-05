@@ -76,3 +76,12 @@ notes and verification evidence.
 ## Recommended order
 
 Resolve O-01, O-03 through O-08 before committing to detailed implementation architecture. O-04, O-09 and O-10 are resolved for the implemented Phase 3 scope by Q1–Q3 above; resolve each remaining decision before the affected future feature is implemented.
+
+## Resolved in Phase 4 (confirmed product decisions)
+
+- Provisional editorial tokens are **confirmed** as the official Phase 4 visual baseline. Brand name/logo, image art direction, icon style and light/dark theme remain Open.
+- Phase 4 security hardening is **web-only**. Native mobile device registration and native offline licensing are explicitly deferred; no concurrent-session cap or 2-session limit was invented.
+- The web player watermark displays signed-in email, short session ID and timestamp. PDF downloads remain checksum-exact; the overlay is a deterrent, not DRM.
+- Phase 4 visual sign-off uses DOM component tests, full typechecking and production build verification. Automated browser screenshots and rendered viewport comparison were **Not run** and must not be claimed.
+
+O-01, O-03, O-05/O-21, O-06/O-07/O-08, O-11, O-15, certificate design/verification, O-22–O-28, session duration/concurrent policy, device identity/reset/reinstall, replacement cooldown, old offline content after replacement, offline expiry, rooted-device policy, download quality/storage/resumability, offline quizzes and delivery-provider/CDN choice remain Open.

@@ -1,8 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
+import { progressBatchChecksum } from '@lms/shared';
 import {
+  PROGRESS_CHECKSUM_KEY,
+  PROGRESS_QUEUE_KEY,
   drainProgressEvents,
   enqueueProgressEvent,
   getClientId,
+  getQuarantine,
+  getQueueIntegrity,
   loadQueue,
   saveQueue,
   type ProgressSyncDeps,
@@ -57,6 +62,9 @@ describe('offline progress-sync queue', () => {
       second.clientEventId,
     ]);
     expect(body?.events.every((event) => !('lessonId' in event) && !('clientId' in event))).toBe(true);
+    expect(body?.checksum).toBe(
+      progressBatchChecksum({ clientId: body!.clientId, events: body!.events }),
+    );
     expect(loadQueue(deps).map((event) => event.lessonId)).toEqual(['L2']);
   });
 
@@ -125,7 +133,7 @@ describe('offline progress-sync queue', () => {
     expect(loadQueue(deps)).toHaveLength(0);
   });
 
-  it('drops terminal 4xx client errors instead of retrying forever', async () => {
+  it('quarantines terminal 4xx client errors instead of retrying forever or losing them', async () => {
     const deps = makeDeps();
     enqueueProgressEvent({ lessonId: 'L1', type: 'complete' }, deps);
     const error = Object.assign(new Error('lesson locked'), { status: 403 });
@@ -139,9 +147,34 @@ describe('offline progress-sync queue', () => {
       expect(result.message).toContain('lesson locked');
     }
     expect(loadQueue(deps)).toHaveLength(0);
+    expect(getQuarantine(deps)).toHaveLength(1);
+    expect(getQuarantine(deps)[0]?.events?.[0]?.type).toBe('complete');
     const again = await drainProgressEvents('L1', send, deps);
     expect(again.status).toBe('idle');
     expect(send).toHaveBeenCalledTimes(1);
+  });
+
+  it('quarantines a tampered localStorage queue and does not transmit corrupted events', async () => {
+    const storage = memoryStorage();
+    const deps = makeDeps({ storage });
+    const event = enqueueProgressEvent({ lessonId: 'L1', type: 'start' }, deps);
+    const tampered = [{ ...event, type: 'complete', progressPercent: 100 }];
+    storage.setItem(PROGRESS_QUEUE_KEY, JSON.stringify(tampered));
+    // Deliberately leave the original checksum in place.
+    expect(storage.getItem(PROGRESS_CHECKSUM_KEY)).toBeTruthy();
+
+    const send = vi.fn(async (body: ProgressBatchBody) => responseFor(body));
+    const result = await drainProgressEvents('L1', send, deps);
+
+    expect(result.status).toBe('rejected');
+    expect(send).not.toHaveBeenCalled();
+    expect(loadQueue(deps)).toHaveLength(0);
+    const quarantine = getQuarantine(deps);
+    expect(quarantine).toHaveLength(1);
+    expect(quarantine[0]?.reason).toBe('checksum_mismatch');
+    expect(quarantine[0]?.raw).toContain('"complete"');
+    // The tamper flag is consumed once so newly enqueued events can still sync.
+    expect(getQueueIntegrity(deps).tampered).toBe(false);
   });
 
   it('always sends events in ascending sequence order, even from a scrambled queue', async () => {

@@ -61,6 +61,13 @@ describe('AccountPage learning dashboard', () => {
     );
 
     expect(await screen.findByRole('heading', { name: 'Ada Learner' })).toBeTruthy();
+    expect(screen.getByTestId('account-page').getAttribute('data-responsive-layout')).toBe(
+      'stacked-mobile split-tablet grid-desktop',
+    );
+    expect(screen.getByTestId('dashboard-hero')).toBeTruthy();
+    expect(screen.getByTestId('dashboard-stats')).toBeTruthy();
+    expect(screen.getByTestId('continue-learning-card')).toBeTruthy();
+    expect(screen.getByTestId('stat-active-courses').className).toContain('stat');
     expect(await screen.findByText('Learning Course')).toBeTruthy();
 
     const progress = screen.getByRole('progressbar', { name: 'Learning Course progress' });

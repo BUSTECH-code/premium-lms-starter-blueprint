@@ -104,3 +104,11 @@
 ## Explicit exclusions
 
 Do not infer or implement live tutoring, mentorship, subscriptions, course bundles, gifts, corporate learning or complex instructor marketplace functionality without approval.
+
+## Confirmed Phase 4 decisions (2026-11-05)
+
+- **Confirmed:** provisional editorial tokens are the official Phase 4 visual baseline; exact values are documented in `docs/design/design-system.md`.
+- **Confirmed:** web-only content-protection hardening — short-lived scoped media grants, anti-hotlink referrer/origin checks, audit events, rate limits, no-store headers and progressive-sync tamper checks.
+- **Confirmed:** a visible, non-invasive web player watermark with email, short session ID and timestamp; PDF downloads remain checksum-exact and unmutated.
+- **Confirmed:** Phase 4 sign-off uses DOM component tests, full typechecking and production build verification; automated browser screenshots were **Not run**.
+- **Deferred:** native mobile device registration, native offline licensing and any concurrent-session cap. No 2-session cap was invented.

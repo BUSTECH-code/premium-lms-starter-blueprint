@@ -10,6 +10,7 @@ import {
   CORRECT_QUIZ_ANSWERS,
   LESSON_IDS,
   SLUG,
+  VIEWER_WATERMARK,
   batchFromInit,
   makeDownloadDetail,
   makePlayerState,
@@ -72,6 +73,25 @@ describe('CoursePlayerPage', () => {
     });
 
     expect(await screen.findByRole('heading', { name: 'Watch the introduction' })).toBeTruthy();
+    expect(screen.getByTestId('player-shell').getAttribute('data-responsive-layout')).toBe(
+      'stacked-mobile split-tablet grid-desktop',
+    );
+    expect(screen.getByTestId('player-header')).toBeTruthy();
+    expect(screen.getByTestId('player-layout')).toBeTruthy();
+    expect(screen.getByTestId('player-sidebar')).toBeTruthy();
+    expect(screen.getByTestId('lesson-stage')).toBeTruthy();
+    expect(screen.getByTestId('curriculum-panel')).toBeTruthy();
+    expect(screen.getByTestId('gradebook-panel')).toBeTruthy();
+    expect(screen.getByTestId('sync-status')).toBeTruthy();
+    const watermark = screen.getByTestId('session-watermark');
+    expect(watermark.textContent).toContain(VIEWER_WATERMARK.email);
+    expect(watermark.textContent).toContain(VIEWER_WATERMARK.sessionRef);
+    expect(watermark.querySelector('time')?.getAttribute('datetime')).toBe(
+      VIEWER_WATERMARK.issuedAt,
+    );
+    expect(screen.getByTestId('video-frame').querySelector('video')?.getAttribute('controlslist')).toContain(
+      'nodownload',
+    );
     expect(screen.getAllByText('Locked').length).toBeGreaterThan(0);
     expect(screen.getAllByText(/Complete “Watch the introduction” first/).length).toBeGreaterThan(0);
     expect(screen.getByRole('button', { name: 'Mark complete' })).toBeTruthy();
@@ -242,6 +262,7 @@ describe('CoursePlayerPage', () => {
     });
 
     expect(await screen.findByRole('heading', { name: 'This lesson is locked' })).toBeTruthy();
+    expect(screen.getByTestId('player-error-state').getAttribute('data-state')).toBe('error');
     expect(screen.getByText(/Complete “Watch the introduction”/)).toBeTruthy();
     const next = await screen.findByRole('link', { name: 'Go to your next lesson' });
     expect(next.getAttribute('href')).toBe(`/learn/${SLUG}/${LESSON_IDS.video}`);

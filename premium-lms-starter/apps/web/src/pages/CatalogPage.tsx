@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { ApiError, apiFetch } from '../auth/api.js';
-import { Alert, Badge, Button, Spinner, TextField } from '../components/ui.js';
+import { CourseCover, PageIntro, StatePanel } from '../components/editorial.js';
+import { Badge, Button, Spinner, TextField } from '../components/ui.js';
 import { formatDuration, formatPrice } from '../lib/format.js';
 
 interface CourseListItem {
@@ -27,11 +28,23 @@ interface CategoryItem {
 
 const PAGE_SIZE = 12;
 
+function categoryLabel(course: CourseListItem) {
+  return course.categories.length > 0
+    ? course.categories.map((category) => category.name).join(' · ')
+    : 'Course';
+}
+
+function courseMeta(course: CourseListItem) {
+  return `${course.instructor.name} · ${course.moduleCount} module${
+    course.moduleCount === 1 ? '' : 's'
+  } · ${course.lessonCount} lesson${course.lessonCount === 1 ? '' : 's'} · ${formatDuration(
+    course.totalDurationSeconds,
+  )}`;
+}
+
 /**
- * Public catalogue: search + category/tag filters (server-side), rendered as
- * editorial rows — deliberately not a wall of identical cards (AGENTS.md).
- * Only published courses are ever listed; no ratings/discounts/student
- * counts are shown because the product does not track them.
+ * Public catalogue: server-side search/filters, one featured editorial course
+ * and compact rows for the rest. All displayed facts come from the API.
  */
 export function CatalogPage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -125,23 +138,38 @@ export function CatalogPage() {
     }
   }
 
-  return (
-    <div className="page">
-      <header className="page-header">
-        <div>
-          <p className="eyebrow">Catalogue</p>
-          <h1>Courses</h1>
-          <p className="muted lede">
-            Browse every published course. Search by title, instructor or tag, or narrow the list
-            by category.
-          </p>
-        </div>
-      </header>
+  const featured = items[0];
+  const remaining = items.slice(1);
 
-      <section className="panel catalogue-filters" aria-label="Filter courses">
+  return (
+    <div
+      className="page catalog-page"
+      data-testid="catalog-page"
+      data-responsive-layout="stacked-mobile split-tablet grid-desktop"
+    >
+      <PageIntro
+        eyebrow="Course catalogue"
+        title="Learn with intent"
+        lede="Browse every published course. Search by title, instructor or tag, or narrow the list by category."
+        testId="catalog-hero"
+        aside={
+          <div className="catalogue-principles" data-testid="catalogue-principles">
+            <p className="section-label">This catalogue</p>
+            <p className="muted">
+              Published courses only, with real instructors, lesson counts, durations and prices.
+            </p>
+          </div>
+        }
+      />
+
+      <section
+        className="panel catalogue-filters"
+        aria-label="Filter courses"
+        data-testid="catalogue-filters"
+      >
         <form
           role="search"
-          className="inline-form"
+          className="inline-form filter-grid"
           onSubmit={(event) => {
             event.preventDefault();
             applyFilters({ search: searchDraft.trim() });
@@ -155,23 +183,25 @@ export function CatalogPage() {
             onChange={(event) => setSearchDraft(event.target.value)}
             placeholder="Title, instructor or tag"
           />
-          <Button type="submit">Search</Button>
-          {query || activeCategory || activeTag ? (
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={() => {
-                setSearchDraft('');
-                setSearchParams({});
-              }}
-            >
-              Clear filters
-            </Button>
-          ) : null}
+          <div className="page-actions">
+            <Button type="submit">Search</Button>
+            {query || activeCategory || activeTag ? (
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => {
+                  setSearchDraft('');
+                  setSearchParams({});
+                }}
+              >
+                Clear filters
+              </Button>
+            ) : null}
+          </div>
         </form>
 
         {categories.length > 0 ? (
-          <div className="chip-row" aria-label="Categories">
+          <div className="filter-chips" aria-label="Categories">
             {categories.map((category) => (
               <button
                 key={category.slug}
@@ -198,67 +228,133 @@ export function CatalogPage() {
         ) : null}
       </section>
 
-      {error ? <Alert>{error}</Alert> : null}
+      {error ? (
+        <StatePanel
+          kind="error"
+          title="Catalogue unavailable"
+          description={error}
+          testId="catalog-error-state"
+        />
+      ) : null}
 
       {loading ? (
-        <div className="spinner-row" aria-live="polite">
+        <StatePanel
+          kind="loading"
+          title="Loading courses"
+          description="Fetching published courses from the catalogue."
+          testId="catalog-loading-state"
+        >
           <Spinner label="Loading courses…" />
-        </div>
+        </StatePanel>
       ) : items.length === 0 ? (
-        <section className="panel empty-state">
-          <p className="muted">
-            No published courses match{query ? ` “${query}”` : ' your filters'}
-            {activeCategory ? ` in ${activeCategory}` : ''}.
-          </p>
-        </section>
-      ) : (
+        <StatePanel
+          kind="empty"
+          title="No courses found"
+          description={
+            <>
+              No published courses match{query ? ` “${query}”` : ' your filters'}
+              {activeCategory ? ` in ${activeCategory}` : ''}.
+            </>
+          }
+          testId="catalog-empty-state"
+        >
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={() => {
+              setSearchDraft('');
+              setSearchParams({});
+            }}
+          >
+            Clear filters
+          </Button>
+        </StatePanel>
+      ) : featured ? (
         <>
-          <p className="muted result-count" aria-live="polite">
+          <p className="muted result-count" aria-live="polite" data-testid="catalog-result-count">
             {total} course{total === 1 ? '' : 's'}
           </p>
-          <div className="course-list">
-            {items.map((course) => (
-              <article key={course.id} className="course-row">
-                <div className="course-row-main">
-                  <p className="eyebrow">
-                    {course.categories.length > 0
-                      ? course.categories.map((c) => c.name).join(' · ')
-                      : 'Course'}
-                  </p>
-                  <h2>
-                    <Link to={course.href}>{course.title}</Link>
-                  </h2>
-                  {course.summary ? <p className="muted">{course.summary}</p> : null}
-                  <p className="course-meta muted">
-                    {course.instructor.name} · {course.moduleCount} module
-                    {course.moduleCount === 1 ? '' : 's'} · {course.lessonCount} lesson
-                    {course.lessonCount === 1 ? '' : 's'} ·{' '}
-                    {formatDuration(course.totalDurationSeconds)}
-                  </p>
-                  {course.tags.length > 0 ? (
-                    <div className="badge-row">
-                      {course.tags.map((tag) => (
-                        <button
-                          key={tag}
-                          type="button"
-                          className="badge tag-badge"
-                          onClick={() => applyFilters({ tag, search: '', category: '' })}
-                        >
-                          {tag}
-                        </button>
-                      ))}
-                    </div>
-                  ) : null}
+          <section
+            className="featured-course"
+            aria-labelledby="featured-course-title"
+            data-testid="featured-course"
+          >
+            <CourseCover
+              title={featured.title}
+              category={categoryLabel(featured)}
+              index={1}
+              testId="featured-course-cover"
+            />
+            <div className="featured-course-body">
+              <p className="eyebrow">Selected course · {categoryLabel(featured)}</p>
+              <h2 id="featured-course-title">
+                <Link to={featured.href}>{featured.title}</Link>
+              </h2>
+              {featured.summary ? <p className="featured-summary">{featured.summary}</p> : null}
+              <p className="course-meta muted">{courseMeta(featured)}</p>
+              {featured.tags.length > 0 ? (
+                <div className="badge-row">
+                  {featured.tags.map((tag) => (
+                    <button
+                      key={tag}
+                      type="button"
+                      className="badge tag-badge"
+                      onClick={() => applyFilters({ tag, search: '', category: '' })}
+                    >
+                      {tag}
+                    </button>
+                  ))}
                 </div>
-                <div className="course-row-side">
-                  <p className="price">{formatPrice(course.price.amount, course.price.currency)}</p>
-                  <Link className="button secondary" to={course.href}>
-                    View course
-                  </Link>
-                </div>
-              </article>
-            ))}
-          </div>
+              ) : null}
+            </div>
+            <div className="featured-course-side">
+              <p className="featured-price">
+                {formatPrice(featured.price.amount, featured.price.currency)}
+              </p>
+              <Link className="button secondary" to={featured.href}>
+                View course
+              </Link>
+            </div>
+          </section>
+
+          {remaining.length > 0 ? (
+            <div className="course-list" data-testid="catalog-course-list">
+              {remaining.map((course, index) => (
+                <article key={course.id} className="course-row" data-testid="catalog-course-row">
+                  <div className="course-row-main">
+                    <p className="eyebrow">
+                      {String(index + 2).padStart(2, '0')} · {categoryLabel(course)}
+                    </p>
+                    <h2>
+                      <Link to={course.href}>{course.title}</Link>
+                    </h2>
+                    {course.summary ? <p className="muted">{course.summary}</p> : null}
+                    <p className="course-meta muted">{courseMeta(course)}</p>
+                    {course.tags.length > 0 ? (
+                      <div className="badge-row">
+                        {course.tags.map((tag) => (
+                          <button
+                            key={tag}
+                            type="button"
+                            className="badge tag-badge"
+                            onClick={() => applyFilters({ tag, search: '', category: '' })}
+                          >
+                            {tag}
+                          </button>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
+                  <div className="course-row-side">
+                    <p className="price">{formatPrice(course.price.amount, course.price.currency)}</p>
+                    <Link className="button secondary" to={course.href}>
+                      View course
+                    </Link>
+                  </div>
+                </article>
+              ))}
+            </div>
+          ) : null}
 
           {items.length < total ? (
             <div className="pager">
@@ -268,7 +364,7 @@ export function CatalogPage() {
             </div>
           ) : null}
         </>
-      )}
+      ) : null}
     </div>
   );
 }

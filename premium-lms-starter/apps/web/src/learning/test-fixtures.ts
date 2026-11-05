@@ -15,6 +15,7 @@ import type {
   ProgressBatchResponse,
   ProgressEventBody,
   QuizAttemptResponse,
+  ViewerWatermark,
 } from './types.js';
 import type { StorageLike } from './progress-sync.js';
 
@@ -48,6 +49,12 @@ const MODULE_ONE = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb1';
 const MODULE_TWO = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb2';
 const FIXED_NOW = '2026-11-05T10:00:00.000Z';
 const FUTURE = '2026-11-05T10:05:00.000Z';
+
+export const VIEWER_WATERMARK: ViewerWatermark = {
+  email: 'learner@example.com',
+  sessionRef: 'a1b2c3d4e5f6',
+  issuedAt: FIXED_NOW,
+};
 
 export function memoryStorage(): StorageLike {
   const values = new Map<string, string>();
@@ -147,8 +154,17 @@ export function makeProgress(
 }
 
 export function makeMediaGrant(purpose: 'stream' | 'download' = 'stream'): MediaGrant {
+  const url = [
+    '/api/media/content',
+    `?grant=${'a'.repeat(64)}`,
+    `&purpose=${purpose}`,
+    `&exp=${Math.floor(Date.parse(FUTURE) / 1000)}`,
+    '&sid=a1b2c3d4e5f6',
+    `&nonce=${'b'.repeat(32)}`,
+    `&sig=${'c'.repeat(64)}`,
+  ].join('');
   return {
-    url: `/api/media/content?grant=${'a'.repeat(64)}${purpose === 'download' ? '&download=1' : ''}`,
+    url,
     expiresAt: FUTURE,
     purpose,
     mimeType: purpose === 'stream' ? 'video/mp4' : 'application/pdf',
@@ -200,6 +216,7 @@ export function makePlayerState(options: PlayerStateOptions = {}): PlayerStateRe
       summary: 'A short, sequential learning journey.',
       href: `/learn/${SLUG}`,
     },
+    viewer: VIEWER_WATERMARK,
     criteriaVersion: 1,
     criteria: {
       version: 1,
@@ -265,6 +282,7 @@ function detailBase(options: DetailOptions = {}) {
       title: 'Learning Course',
       href: `/learn/${SLUG}`,
     },
+    viewer: VIEWER_WATERMARK,
   };
 }
 

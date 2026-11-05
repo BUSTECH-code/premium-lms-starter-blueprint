@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { FormEvent, SyntheticEvent } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ApiError } from '../auth/api.js';
+import { PageIntro, StatePanel } from '../components/editorial.js';
 import { Alert, Badge, Button, Spinner } from '../components/ui.js';
 import { formatDuration } from '../lib/format.js';
 import { learningApi } from './api.js';
@@ -45,6 +46,11 @@ function progressStatusText(status: LessonStatus): string {
   if (status === 'completed') return 'Completed';
   if (status === 'in_progress') return 'In progress';
   return 'Not started';
+}
+
+function formatWatermarkTime(value: string): string {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
 }
 
 function Curriculum({
@@ -128,7 +134,7 @@ function Curriculum({
 function Gradebook({ player }: { player: PlayerStateResponse }) {
   const book = player.gradebook;
   return (
-    <section className="gradebook-panel" aria-label="Gradebook">
+    <section className="gradebook-panel" aria-label="Gradebook" data-testid="gradebook-panel">
       <h2>Gradebook</h2>
       {book.quizCount === 0 ? (
         <p className="muted">This course has no graded quizzes.</p>
@@ -453,8 +459,15 @@ export function CoursePlayerPage({ syncDeps }: CoursePlayerPageProps = {}) {
 
   if (loading) {
     return (
-      <div className="page player-page">
-        <Spinner label="Opening your course…" />
+      <div className="page player-page player-shell" data-testid="player-loading">
+        <StatePanel
+          kind="loading"
+          title="Opening your course"
+          description="Loading the sequential curriculum and current lesson."
+          testId="player-loading-state"
+        >
+          <Spinner label="Opening your course…" />
+        </StatePanel>
       </div>
     );
   }
@@ -462,48 +475,49 @@ export function CoursePlayerPage({ syncDeps }: CoursePlayerPageProps = {}) {
   if (pageError || !player) {
     const locked = errorCode === 'lesson_locked';
     const notEntitled = errorCode === 'not_entitled' || errorCode === 'entitlement_revoked';
+    const heading = locked
+      ? 'This lesson is locked'
+      : notEntitled
+        ? 'You don’t have access'
+        : errorCode === 'course_not_found' || errorCode === 'lesson_not_found'
+          ? 'Not found'
+          : 'Could not open the course';
     return (
-      <div className="full-page-state">
-        <div className="panel narrow">
-          <p className="eyebrow">{locked ? 'Lesson locked' : notEntitled ? '403' : 'Unavailable'}</p>
-          <h1>
-            {locked
-              ? 'This lesson is locked'
-              : notEntitled
-                ? 'You don’t have access'
-                : errorCode === 'course_not_found' || errorCode === 'lesson_not_found'
-                  ? 'Not found'
-                  : 'Could not open the course'}
-          </h1>
-          <p className="muted">{pageError ?? 'This course could not be loaded.'}</p>
-          <div className="button-row">
-            {player ? (
-              <Link
-                className="button primary"
-                to={suggestedHref(player) ?? '/'}
-              >
-                Go to your next lesson
-              </Link>
-            ) : null}
-            <Link className="button secondary" to="/">
-              Your courses
+      <div className="full-page-state" data-testid="player-error-page">
+        <StatePanel
+          kind="error"
+          className="narrow"
+          title={heading}
+          description={pageError ?? 'This course could not be loaded.'}
+          testId="player-error-state"
+        >
+          {player ? (
+            <Link className="button primary" to={suggestedHref(player) ?? '/'}>
+              Go to your next lesson
             </Link>
-          </div>
-        </div>
+          ) : null}
+          <Link className="button secondary" to="/">
+            Your courses
+          </Link>
+        </StatePanel>
       </div>
     );
   }
 
   if (player.lessons.length === 0 || !detail) {
     return (
-      <div className="page player-page">
-        <div className="empty-state">
-          <h1>{player.course.title}</h1>
-          <p className="muted">This course has no lessons yet.</p>
+      <div className="page player-page player-shell" data-testid="player-empty-page">
+        <StatePanel
+          kind="empty"
+          className="narrow"
+          title={player.course.title}
+          description="This course has no lessons yet."
+          testId="player-empty-state"
+        >
           <Link className="button secondary" to="/">
             Back to your courses
           </Link>
-        </div>
+        </StatePanel>
       </div>
     );
   }
@@ -514,10 +528,15 @@ export function CoursePlayerPage({ syncDeps }: CoursePlayerPageProps = {}) {
   const completed = detail.progress.status === 'completed';
   const quiz = detail.content.kind === 'quiz' ? detail.content.quiz : null;
   const isQuiz = quiz !== null;
+  const viewer = detail.viewer ?? player.viewer;
 
   return (
-    <div className="page player-page">
-      <nav className="breadcrumb" aria-label="Breadcrumb">
+    <div
+      className="page player-page player-shell"
+      data-testid="player-shell"
+      data-responsive-layout="stacked-mobile split-tablet grid-desktop"
+    >
+      <nav className="breadcrumbs" aria-label="Breadcrumb" data-testid="player-breadcrumbs">
         <Link to="/">Your courses</Link>
         <span aria-hidden="true"> / </span>
         <Link to={`/courses/${player.course.slug}`}>{player.course.title}</Link>
@@ -525,24 +544,30 @@ export function CoursePlayerPage({ syncDeps }: CoursePlayerPageProps = {}) {
         <span>Learning</span>
       </nav>
 
-      <header className="player-header">
-        <div>
-          <p className="eyebrow">Course player</p>
-          <h1>{player.course.title}</h1>
-          {player.course.summary ? <p className="lede">{player.course.summary}</p> : null}
-        </div>
-        <div className="player-header-meta">
-          <Badge>
-            {player.completion.status === 'completed' ? 'Course complete' : 'In progress'}
-          </Badge>
-          <span className="muted">{progressSummary(player)}</span>
-          <span className="muted small-print">
-            Completion rules v{player.criteriaVersion} · {player.criteria.quizPassingScorePercent}% quiz pass
-          </span>
-        </div>
-      </header>
+      <PageIntro
+        eyebrow="Course player"
+        title={player.course.title}
+        lede={
+          player.course.summary ??
+          'Work through each lesson in order. Completion is explicit unless the lesson is a quiz.'
+        }
+        className="player-header"
+        testId="player-header"
+        aside={
+          <div className="player-header-meta" data-testid="player-header-meta">
+            <Badge>
+              {player.completion.status === 'completed' ? 'Course complete' : 'In progress'}
+            </Badge>
+            <span className="muted">{progressSummary(player)}</span>
+            <span className="muted small-print">
+              Completion rules v{player.criteriaVersion} ·{' '}
+              {player.criteria.quizPassingScorePercent}% quiz pass
+            </span>
+          </div>
+        }
+      />
 
-      <div className="player-layout">
+      <div className="player-layout" data-testid="player-layout">
         <main className="player-main" aria-label="Lesson">
           <header className="lesson-header">
             <p className="eyebrow">
@@ -560,24 +585,39 @@ export function CoursePlayerPage({ syncDeps }: CoursePlayerPageProps = {}) {
           {mediaError ? <Alert>{mediaError}</Alert> : null}
 
           {detail.content.kind === 'video' ? (
-            <section className="lesson-stage" aria-label="Video lesson">
-              <video
-                key={detail.content.media.url}
-                ref={videoRef}
-                className="player-video"
-                controls
-                preload="metadata"
-                playsInline
-                src={detail.content.media.url}
-                onTimeUpdate={(event) => handleVideoEvent(event)}
-                onPause={(event) => handleVideoEvent(event, true)}
-                onEnded={(event) => handleVideoEvent(event, true)}
-                onError={() =>
-                  setMediaError('This video could not be played. Refresh the secure link and try again.')
-                }
-              >
-                Your browser does not support HTML video.
-              </video>
+            <section className="lesson-stage" aria-label="Video lesson" data-testid="lesson-stage">
+              <div className="video-frame" data-testid="video-frame">
+                <video
+                  key={detail.content.media.url}
+                  ref={videoRef}
+                  className="player-video"
+                  controls
+                  controlsList="nodownload noremoteplayback"
+                  disablePictureInPicture
+                  crossOrigin="use-credentials"
+                  preload="metadata"
+                  playsInline
+                  src={detail.content.media.url}
+                  onTimeUpdate={(event) => handleVideoEvent(event)}
+                  onPause={(event) => handleVideoEvent(event, true)}
+                  onEnded={(event) => handleVideoEvent(event, true)}
+                  onError={() =>
+                    setMediaError('This video could not be played. Refresh the secure link and try again.')
+                  }
+                >
+                  Your browser does not support HTML video.
+                </video>
+                <div
+                  className="session-watermark"
+                  data-testid="session-watermark"
+                  role="note"
+                  aria-label="Session watermark"
+                >
+                  <span>{viewer.email}</span>
+                  <span>Session {viewer.sessionRef}</span>
+                  <time dateTime={viewer.issuedAt}>{formatWatermarkTime(viewer.issuedAt)}</time>
+                </div>
+              </div>
               <div className="media-bar">
                 <span className="muted">
                   {detail.content.media.fileName} · {formatBytes(detail.content.media.sizeBytes)}
@@ -604,7 +644,7 @@ export function CoursePlayerPage({ syncDeps }: CoursePlayerPageProps = {}) {
           ) : null}
 
           {detail.content.kind === 'download' ? (
-            <section className="download-card" aria-label="Lesson resource">
+            <section className="download-card" aria-label="Lesson resource" data-testid="download-card">
               <p className="eyebrow">Secured resource</p>
               <h3>{detail.content.media.fileName}</h3>
               <p className="muted">
@@ -623,7 +663,7 @@ export function CoursePlayerPage({ syncDeps }: CoursePlayerPageProps = {}) {
           ) : null}
 
           {detail.content.kind === 'quiz' && quiz ? (
-            <section className="quiz-stage" aria-label="Quiz">
+            <section className="quiz-stage" aria-label="Quiz" data-testid="quiz-stage">
               <div className="quiz-head">
                 <div>
                   <p className="eyebrow">Assessment</p>
@@ -742,7 +782,7 @@ export function CoursePlayerPage({ syncDeps }: CoursePlayerPageProps = {}) {
             ) : null}
           </div>
 
-          <p className="sync-status" role="status" aria-live="polite">
+          <p className="sync-status" role="status" aria-live="polite" data-testid="sync-status">
             {sync.status === 'syncing'
               ? 'Saving progress…'
               : (sync.message ?? 'Progress is saved automatically.')}
@@ -750,8 +790,8 @@ export function CoursePlayerPage({ syncDeps }: CoursePlayerPageProps = {}) {
           </p>
         </main>
 
-        <aside className="player-sidebar" aria-label="Course progress and curriculum">
-          <details className="curriculum-panel" open>
+        <aside className="player-sidebar" aria-label="Course progress and curriculum" data-testid="player-sidebar">
+          <details className="curriculum-panel" open data-testid="curriculum-panel">
             <summary>
               <span>Curriculum</span>
               <span className="muted">{progressSummary(player)}</span>

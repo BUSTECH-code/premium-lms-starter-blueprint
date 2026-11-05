@@ -28,6 +28,7 @@ import { LearningError, type LearningErrorCode } from './learning-errors.js';
 import {
   createMediaGrant,
   getLessonMediaAsset,
+  type MediaGrantContext,
   type MediaGrantView,
 } from './media.js';
 
@@ -1053,6 +1054,7 @@ export async function getLessonDetail(
   db: DbClient,
   userId: string,
   lessonId: string,
+  grantContext: MediaGrantContext,
 ): Promise<LessonDetailView> {
   const { lesson, context, lessons, progress } = await getLessonContext(db, userId, lessonId);
   const snapshot = progress[lesson.id] ?? emptyProgressSnapshot();
@@ -1071,7 +1073,12 @@ export async function getLessonDetail(
       throw new LearningError('content_not_configured', 'This lesson has no media configured.');
     }
     const purpose = lesson.kind === 'video' ? 'stream' : 'download';
-    const media = await createMediaGrant(db, { userId, lessonId, purpose });
+    const media = await createMediaGrant(db, {
+      userId,
+      lessonId,
+      purpose,
+      context: grantContext,
+    });
     content = { kind: lesson.kind, media };
   } else if (lesson.kind === 'text') {
     const { rows } = await db.query<{ body_text: string | null }>(

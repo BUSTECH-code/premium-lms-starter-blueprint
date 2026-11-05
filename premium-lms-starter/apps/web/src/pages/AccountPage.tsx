@@ -3,7 +3,8 @@ import { Link } from 'react-router-dom';
 import { ApiError, apiFetch } from '../auth/api.js';
 import { useAuth } from '../auth/AuthProvider.js';
 import { can } from '../auth/permissions.js';
-import { Alert, Badge, Button, Spinner } from '../components/ui.js';
+import { PageIntro, StatePanel, Stat } from '../components/editorial.js';
+import { Badge, Button, Spinner } from '../components/ui.js';
 import { formatDate } from '../lib/format.js';
 
 interface LearningSummary {
@@ -42,7 +43,7 @@ function learningOf(item: EnrollmentItem): LearningSummary {
   );
 }
 
-/** Account page: session info plus the learner's enrolled courses dashboard. */
+/** Account dashboard: real enrolment, progress and gradebook data. */
 export function AccountPage() {
   const { user, logout } = useAuth();
   const [enrollments, setEnrollments] = useState<EnrollmentItem[] | null>(null);
@@ -79,6 +80,10 @@ export function AccountPage() {
     (total, item) => total + learningOf(item).totalLessons,
     0,
   );
+  const gradebookAttempts = (enrollments ?? []).reduce(
+    (total, item) => total + learningOf(item).gradebookAttempts,
+    0,
+  );
   const gradebookAverages = (enrollments ?? [])
     .map((item) => learningOf(item).gradebookAverage)
     .filter((value): value is number => value !== null);
@@ -92,66 +97,98 @@ export function AccountPage() {
       : null;
 
   return (
-    <div className="page">
-      <header className="page-header">
-        <div>
-          <p className="eyebrow">Your account</p>
-          <h1>{user.name}</h1>
-        </div>
-        <Button variant="secondary" onClick={() => void logout()}>
-          Sign out
-        </Button>
-      </header>
+    <div
+      className="page account-page"
+      data-testid="account-page"
+      data-responsive-layout="stacked-mobile split-tablet grid-desktop"
+    >
+      <PageIntro
+        eyebrow="Account dashboard"
+        title={user.name}
+        lede="Your courses, progress and gradebook in one place."
+        className="dashboard-hero"
+        testId="dashboard-hero"
+        actions={
+          <Button variant="secondary" onClick={() => void logout()}>
+            Sign out
+          </Button>
+        }
+      />
 
-      <section className="panel">
+      {(enrollments ?? []).length > 0 && !libraryError ? (
+        <section
+          className="panel dashboard-stats"
+          aria-label="Learning summary"
+          data-testid="dashboard-stats"
+        >
+          <Stat label="Active courses" value={activeCourses} testId="stat-active-courses" />
+          <Stat
+            label="Lessons completed"
+            value={`${completedLessons}/${totalLessons}`}
+            testId="stat-lessons-completed"
+          />
+          <Stat
+            label="Average best score"
+            value={overallAverage === null ? '—' : `${overallAverage}%`}
+            testId="stat-average-score"
+          />
+          <Stat
+            label="Graded attempts"
+            value={gradebookAttempts}
+            testId="stat-graded-attempts"
+          />
+        </section>
+      ) : null}
+
+      <section className="panel library-panel" aria-labelledby="library-title">
         <div className="section-head">
           <div>
             <p className="eyebrow">Continue learning</p>
-            <h2>Your courses</h2>
+            <h2 id="library-title">Your courses</h2>
           </div>
           <Link className="button secondary" to="/courses">
             Browse the catalogue
           </Link>
         </div>
 
-        {(enrollments ?? []).length > 0 && !libraryError ? (
-          <div className="dashboard-stats" aria-label="Learning summary">
-            <div>
-              <p className="eyebrow">Active courses</p>
-              <p className="stat-value">{activeCourses}</p>
-            </div>
-            <div>
-              <p className="eyebrow">Lessons completed</p>
-              <p className="stat-value">
-                {completedLessons}/{totalLessons}
-              </p>
-            </div>
-            <div>
-              <p className="eyebrow">Average best score</p>
-              <p className="stat-value">
-                {overallAverage === null ? '—' : `${overallAverage}%`}
-              </p>
-            </div>
-          </div>
-        ) : null}
-
         {enrollments === null ? (
-          <Spinner label="Loading your courses…" />
+          <StatePanel
+            kind="loading"
+            title="Loading your courses"
+            description="Fetching enrolments, progress and gradebook summaries."
+            testId="library-loading-state"
+          >
+            <Spinner label="Loading your courses…" />
+          </StatePanel>
         ) : libraryError ? (
-          <Alert>{libraryError}</Alert>
+          <StatePanel
+            kind="error"
+            title="Library unavailable"
+            description={libraryError}
+            testId="library-error-state"
+          />
         ) : enrollments.length === 0 ? (
-          <div className="empty-state">
-            <p className="muted">You are not enrolled in any courses yet.</p>
+          <StatePanel
+            kind="empty"
+            title="No courses yet"
+            description="You are not enrolled in any courses yet."
+            testId="library-empty-state"
+          >
             <Link className="button secondary" to="/courses">
               Browse the catalogue
             </Link>
-          </div>
+          </StatePanel>
         ) : (
           <ul className="enrollment-list">
-            {enrollments.map((item) => {
+            {enrollments.map((item, index) => {
               const learning = learningOf(item);
+              const actionLabel = learning.progressPercent > 0 ? 'Continue learning' : 'Open course';
               return (
-                <li key={item.enrollmentId} className="enrollment-row">
+                <li
+                  key={item.enrollmentId}
+                  className={`enrollment-row${index === 0 ? ' featured' : ''}`}
+                  data-testid="enrollment-row"
+                >
                   <div className="enrollment-main">
                     <div className="enrollment-title-row">
                       <Link to={item.course.href}>{item.course.title}</Link>
@@ -180,10 +217,20 @@ export function AccountPage() {
                         style={{ width: `${learning.progressPercent}%` }}
                       />
                     </div>
+                    {index === 0 ? (
+                      <div className="continue-learning-card" data-testid="continue-learning-card">
+                        <span className="muted">Pick up where you left off.</span>
+                        <Link className="button secondary" to={learning.href}>
+                          {actionLabel}
+                        </Link>
+                      </div>
+                    ) : null}
                   </div>
-                  <Link className="button secondary" to={learning.href}>
-                    {learning.progressPercent > 0 ? 'Continue learning' : 'Open course'}
-                  </Link>
+                  {index === 0 ? null : (
+                    <Link className="button secondary" to={learning.href}>
+                      {actionLabel}
+                    </Link>
+                  )}
                 </li>
               );
             })}
@@ -191,8 +238,8 @@ export function AccountPage() {
         )}
       </section>
 
-      <section className="panel">
-        <h2>Profile</h2>
+      <section className="panel profile-panel" aria-labelledby="profile-title">
+        <h2 id="profile-title">Profile</h2>
         <dl className="detail-grid">
           <div>
             <dt>Email</dt>
@@ -215,8 +262,8 @@ export function AccountPage() {
         </dl>
       </section>
 
-      <section className="panel">
-        <h2>Permissions</h2>
+      <section className="panel permissions-panel" aria-labelledby="permissions-title">
+        <h2 id="permissions-title">Permissions</h2>
         {user.permissions.length > 0 ? (
           <ul className="permission-list">
             {user.permissions.map((permission) => (
@@ -233,21 +280,25 @@ export function AccountPage() {
         )}
       </section>
 
-      <section className="panel">
-        <h2>What's live</h2>
+      <section className="panel whats-live-panel" aria-labelledby="whats-live-title">
+        <h2 id="whats-live-title">What's live</h2>
         <p className="muted">
           Catalogue browsing, purchase with the simulated payment provider, automatic enrolment,
           the sequential course player, explicit lesson completion, objective quiz grading and a
-          server-side gradebook are live. Certificates are deliberately not issued in this phase.
+          server-side gradebook are live. Phase 4 adds short-lived signed media grants, anti-hotlink
+          checks, a session watermark, checksummed progressive sync and the confirmed editorial
+          design system. Certificates are deliberately not issued in this phase.
         </p>
-        <Link className="button secondary" to="/courses">
-          Browse the catalogue
-        </Link>
-        {can(user, 'users.read') ? (
-          <Link className="button secondary" to="/admin">
-            Administration
+        <div className="page-actions">
+          <Link className="button secondary" to="/courses">
+            Browse the catalogue
           </Link>
-        ) : null}
+          {can(user, 'users.read') ? (
+            <Link className="button secondary" to="/admin">
+              Administration
+            </Link>
+          ) : null}
+        </div>
       </section>
     </div>
   );

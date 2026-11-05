@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { ApiError, apiFetch } from '../auth/api.js';
-import { Alert, Badge, Button, Spinner } from '../components/ui.js';
+import { PageIntro, StatePanel, Stepper } from '../components/editorial.js';
+import { Badge, Button, Spinner } from '../components/ui.js';
 import { formatDate, formatPrice } from '../lib/format.js';
 
 interface CheckoutSession {
@@ -93,25 +94,32 @@ export function SimulatedCheckoutPage() {
 
   if (loading) {
     return (
-      <div className="page">
-        <div className="spinner-row" aria-live="polite">
+      <div className="page" data-testid="checkout-loading">
+        <StatePanel
+          kind="loading"
+          title="Loading checkout"
+          description="Checking the order and simulated payment state."
+          testId="checkout-loading-state"
+        >
           <Spinner label="Loading checkout…" />
-        </div>
+        </StatePanel>
       </div>
     );
   }
 
   if (notFound) {
     return (
-      <div className="full-page-state">
-        <div className="panel narrow">
-          <p className="eyebrow">Checkout</p>
-          <h1>Checkout session not found</h1>
-          <p className="muted">This checkout does not exist or belongs to another account.</p>
+      <div className="full-page-state" data-testid="checkout-not-found-page">
+        <StatePanel
+          kind="error"
+          title="Checkout session not found"
+          description="This checkout does not exist or belongs to another account."
+          testId="checkout-not-found-state"
+        >
           <Link className="button secondary" to="/courses">
             Back to catalogue
           </Link>
-        </div>
+        </StatePanel>
       </div>
     );
   }
@@ -125,114 +133,145 @@ export function SimulatedCheckoutPage() {
   const failedNow = result?.status === 'processed' && result.event?.type === 'payment.failed';
   const quarantined = result?.status === 'quarantined';
   const payable = !paid && !failedNow && !quarantined && (session?.payable ?? false);
+  const currentStep = paid ? 3 : failedNow || quarantined || payable ? 2 : 1;
 
   return (
-    <div className="page checkout-page">
-      <header className="page-header">
-        <div>
-          <p className="eyebrow">Checkout · simulated gateway</p>
-          <h1>{course?.title ?? 'Order summary'}</h1>
-          <p className="muted lede">
+    <div
+      className="page checkout-page"
+      data-testid="checkout-page"
+      data-responsive-layout="stacked-mobile split-tablet grid-desktop"
+    >
+      <PageIntro
+        eyebrow="Secure checkout · simulated gateway"
+        title="Confirm your enrolment"
+        lede={
+          <>
             This environment uses a <strong>simulated payment provider</strong> — no real money
             moves. The confirmation still travels through the signed webhook pipeline that a real
             gateway would use.
-          </p>
-        </div>
-      </header>
+          </>
+        }
+        className="checkout-hero"
+        testId="checkout-hero"
+        aside={
+          <Stepper
+            steps={['Review', 'Pay', 'Access']}
+            current={currentStep}
+            label="Checkout progress"
+            testId="checkout-stepper"
+          />
+        }
+      />
 
-      {error ? <Alert>{error}</Alert> : null}
+      {error ? (
+        <StatePanel
+          kind="error"
+          title="Checkout error"
+          description={error}
+          testId="checkout-error-state"
+        />
+      ) : null}
 
-      <section className="panel checkout-summary">
-        <dl className="detail-grid">
-          <div>
-            <dt>Course</dt>
-            <dd>{course?.title ?? '—'}</dd>
-          </div>
-          <div>
-            <dt>Amount</dt>
-            <dd>
-              {order ? formatPrice(order.totalAmount, order.currency) : '—'}
-            </dd>
-          </div>
-          <div>
-            <dt>Order</dt>
-            <dd className="muted">{order?.id ?? '—'}</dd>
-          </div>
-          <div>
-            <dt>Status</dt>
-            <dd className="capitalize">{result ? result.checkout.order.status : order?.status}</dd>
-          </div>
-          <div>
-            <dt>Expires</dt>
-            <dd>{order?.expiresAt ? formatDate(order.expiresAt) : '—'}</dd>
-          </div>
-        </dl>
-      </section>
+      <div className="checkout-grid" data-testid="checkout-grid">
+        <section className="panel checkout-summary" data-testid="checkout-summary">
+          <p className="section-label">Order summary</p>
+          <h2>{course?.title ?? 'Order summary'}</h2>
+          <dl className="detail-grid">
+            <div>
+              <dt>Course</dt>
+              <dd>{course?.title ?? '—'}</dd>
+            </div>
+            <div>
+              <dt>Amount</dt>
+              <dd>{order ? formatPrice(order.totalAmount, order.currency) : '—'}</dd>
+            </div>
+            <div>
+              <dt>Order</dt>
+              <dd className="muted">{order?.id ?? '—'}</dd>
+            </div>
+            <div>
+              <dt>Status</dt>
+              <dd className="capitalize">
+                {result ? result.checkout.order.status : order?.status}
+              </dd>
+            </div>
+            <div>
+              <dt>Expires</dt>
+              <dd>{order?.expiresAt ? formatDate(order.expiresAt) : '—'}</dd>
+            </div>
+          </dl>
+        </section>
 
-      {paid ? (
-        <section className="panel success-panel" role="status">
-          <Badge>Payment confirmed</Badge>
-          <h2>Access granted</h2>
-          <p className="muted">
-            Your payment was verified and your enrolment was created. The course is now in your
-            library.
-          </p>
-          <div className="button-row">
+        {paid ? (
+          <StatePanel
+            kind="confirmation"
+            className="checkout-status"
+            title="Access granted"
+            description={
+              <>
+                <Badge>Payment confirmed</Badge> Your payment was verified and your enrolment was
+                created. The course is now in your library.
+              </>
+            }
+            testId="checkout-status"
+          >
             <Link className="button primary" to={`/courses/${course?.slug ?? ''}`}>
               Open the course
             </Link>
             <Link className="button secondary" to="/">
               Your courses
             </Link>
-          </div>
-        </section>
-      ) : quarantined ? (
-        <section className="panel" role="status">
-          <h2>Payment held for review</h2>
-          <p className="muted">
-            The payment could not be verified against our records, so no access was granted. This
-            order needs manual review — no money was applied to your account.
-          </p>
-          <div className="button-row">
+          </StatePanel>
+        ) : quarantined ? (
+          <StatePanel
+            kind="quarantined"
+            className="checkout-status"
+            title="Payment held for review"
+            description="The payment could not be verified against our records, so no access was granted. This order needs manual review — no money was applied to your account."
+            testId="checkout-status"
+          >
             <Link className="button secondary" to="/">
               Your orders
             </Link>
             <Link className="button ghost" to="/courses">
               Back to catalogue
             </Link>
-          </div>
-        </section>
-      ) : failedNow ? (
-        <section className="panel" role="status">
-          <h2>Payment failed</h2>
-          <p className="muted">
-            The simulated gateway declined this payment. No access was granted — you can retry
-            below.
-          </p>
-          <div className="button-row">
+          </StatePanel>
+        ) : failedNow ? (
+          <StatePanel
+            kind="error"
+            className="checkout-status"
+            title="Payment failed"
+            description="The simulated gateway declined this payment. No access was granted — you can retry below."
+            testId="checkout-status"
+          >
             <Button loading={submitting} onClick={() => void complete('success')}>
               Retry with a successful payment
             </Button>
             <Link className="button ghost" to="/courses">
               Abandon checkout
             </Link>
-          </div>
-        </section>
-      ) : session?.expired || order?.status === 'cancelled' ? (
-        <section className="panel" role="status">
-          <h2>Checkout expired</h2>
-          <p className="muted">
-            This checkout is no longer payable. Start again from the catalogue — nothing was
-            charged.
-          </p>
-          <Link className="button secondary" to="/courses">
-            Back to catalogue
-          </Link>
-        </section>
-      ) : payable ? (
-        <section className="panel checkout-actions">
-          <h2>Complete your payment</h2>
-          <div className="button-row">
+          </StatePanel>
+        ) : session?.expired || order?.status === 'cancelled' ? (
+          <StatePanel
+            kind="expired"
+            className="checkout-status"
+            title="Checkout expired"
+            description="This checkout is no longer payable. Start again from the catalogue — nothing was charged."
+            testId="checkout-status"
+          >
+            <Link className="button secondary" to="/courses">
+              Back to catalogue
+            </Link>
+          </StatePanel>
+        ) : payable ? (
+          <StatePanel
+            kind="confirmation"
+            className="checkout-status"
+            title="Complete your payment"
+            description="Both outcomes exercise the real webhook pipeline: success grants access, failure does not."
+            testId="checkout-status"
+          >
             <Button loading={submitting} onClick={() => void complete('success')}>
               Simulate successful payment
             </Button>
@@ -243,21 +282,21 @@ export function SimulatedCheckoutPage() {
             >
               Simulate failed payment
             </Button>
-          </div>
-          <p className="muted small-print">
-            Both outcomes exercise the real webhook pipeline: success grants access, failure does
-            not.
-          </p>
-        </section>
-      ) : (
-        <section className="panel" role="status">
-          <h2>Order {order?.status ?? ''}</h2>
-          <p className="muted">This checkout is not payable right now.</p>
-          <Link className="button secondary" to="/">
-            Your orders
-          </Link>
-        </section>
-      )}
+          </StatePanel>
+        ) : (
+          <StatePanel
+            kind="disabled"
+            className="checkout-status"
+            title={`Order ${order?.status ?? ''}`}
+            description="This checkout is not payable right now."
+            testId="checkout-status"
+          >
+            <Link className="button secondary" to="/">
+              Your orders
+            </Link>
+          </StatePanel>
+        )}
+      </div>
     </div>
   );
 }

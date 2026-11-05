@@ -60,3 +60,12 @@
 - Do not expose private Drive links as a substitute for authorization.
 - Do not delete learning progress when a learner deletes a downloaded file.
 - Do not silently revoke purchased access because a course is no longer sold.
+
+## Confirmed Phase 4 decisions (2026-11-05)
+
+1. The current provisional editorial tokens are the **official confirmed Phase 4 visual baseline**; documentation must say confirmed, not provisional.
+2. Phase 4 security hardening is **web-only**: short-lived scoped media grants, anti-hotlink referrer/origin checks, audit events, rate limits, no-store headers and progressive-sync tamper checks.
+3. The web course player shows a visible, non-invasive session watermark with the signed-in user's email, short session ID and timestamp. PDF downloads stay checksum-exact; the watermark is a deterrent, not DRM.
+4. Phase 4 sign-off uses DOM component tests, full typechecking and production build verification; automated browser screenshot testing was explicitly **Not run**.
+
+Native mobile device registration and native offline licensing are explicitly deferred. The historical two-device/90-day mobile rules above are not implemented in Phase 4, and no 2-session cap or concurrent-session policy was invented. Course entitlement still does not expire because of an offline licence.

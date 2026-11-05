@@ -6,9 +6,10 @@ const rootDir = fileURLToPath(new URL('.', import.meta.url));
 export default defineConfig({
   resolve: {
     alias: {
-      // Tests run against the database package source; the compiled dist is
-      // only used by the API runtime build.
+      // Tests run against package source; compiled dist is only used by the
+      // API runtime build.
       '@lms/db': fileURLToPath(new URL('./packages/db/src/index.ts', import.meta.url)),
+      '@lms/shared': fileURLToPath(new URL('./packages/shared/src/index.ts', import.meta.url)),
     },
   },
   test: {

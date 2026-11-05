@@ -1,6 +1,8 @@
 # Workflow: Protected Offline Learning
 
-## Goal
+> **Phase 4 scope note (approved 2026-11-05).** The mobile licence flow below is a historical/future target. Phase 4 implements **web-only** checksummed progressive synchronization and explicitly defers native device registration and offline licensing.
+
+## Historical mobile goal — deferred in Phase 4
 
 Allow a learner with an active course entitlement to download approved content into the mobile app for offline playback, subject to a 90-day offline licence.
 
@@ -57,3 +59,13 @@ Allow a learner with an active course entitlement to download approved content i
 - Offline expiry behaviour.
 - Device identity and replacement abuse policy.
 - Offline assessments and synchronization.
+
+## Phase 4 web implementation
+
+- Offline progress events are queued in browser localStorage with a SHA-256 queue checksum, per-lesson monotonic sequences and stable client event IDs.
+- On reconnection, the queue drains in bounded batches; each batch carries a canonical checksum computed from the exact event payload.
+- A tampered queue is rejected and quarantined rather than silently replayed. Terminal 4xx responses are quarantined to avoid infinite retries.
+- The API independently validates the checksum, client ID, event IDs, ascending sequences, occurred-at timestamps and progress bounds before writing.
+- Exact-once replay and stale/duplicate handling remain server-authoritative; the browser checksum is an integrity/tamper check, not a trust grant.
+
+No native offline playback, 90-day licence, device registration, download quality/storage policy or offline quiz behaviour was implemented. Those decisions remain Open/deferred.

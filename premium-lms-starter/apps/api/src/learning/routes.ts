@@ -1,5 +1,7 @@
+import { timingSafeEqual } from 'node:crypto';
 import { Router, type NextFunction, type Request, type Response } from 'express';
 import { z } from 'zod';
+import { progressBatchChecksum } from '@lms/shared';
 import {
   createMediaGrant,
   getCoursePlayerState,
@@ -7,6 +9,7 @@ import {
   getLearningCourseContext,
   getLessonContext,
   getLessonDetail,
+  insertAuditEvent,
   readCourseCompletionView,
   recordProgressEvent,
   submitQuizAttempt,
@@ -14,8 +17,12 @@ import {
   type MediaGrantView,
 } from '@lms/db';
 import { authenticate } from '../auth/middleware.js';
+import type { AuthContext } from '../auth/context.js';
 import type { Env } from '../config/env.js';
+import { SlidingWindowRateLimiter, rateLimit } from '../auth/rate-limit.js';
 import { AppError, errors } from '../lib/errors.js';
+import { buildViewerWatermark, type ViewerWatermark } from '../media/watermark.js';
+import { buildSignedMediaUrl } from '../media/signing.js';
 import { toAppError } from './errors.js';
 import {
   getValidatedParams,
@@ -36,22 +43,49 @@ const lessonParamsSchema = z.object({
   lessonId: z.uuid('A valid lesson id is required.'),
 });
 
+const clientIdSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(80)
+  .regex(/^[A-Za-z0-9][A-Za-z0-9._:-]*$/, 'Invalid progress client id.');
+
 const progressEventSchema = z.object({
-  clientEventId: z.string().trim().min(1).max(120),
-  sequence: z.number().int().min(1),
+  clientEventId: z
+    .string()
+    .trim()
+    .min(1)
+    .max(120)
+    .regex(/^[A-Za-z0-9][A-Za-z0-9._:-]*$/, 'Invalid client event id.'),
+  sequence: z.number().int().min(1).max(1_000_000),
   type: z.enum(['start', 'position', 'complete']),
   occurredAt: z
     .string()
     .min(1)
     .max(40)
-    .refine((value) => !Number.isNaN(Date.parse(value)), 'Invalid event timestamp.'),
-  progressPercent: z.number().min(0).max(100).optional(),
-  positionSeconds: z.number().min(0).optional(),
+    .regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/, 'Invalid event timestamp.')
+    .refine((value) => Date.parse(value) <= Date.now() + 300_000, 'Event timestamp cannot be in the future.'),
+  progressPercent: z.number().min(0).max(100).refine(Number.isFinite, 'Invalid progress percent.').optional(),
+  positionSeconds: z.number().min(0).refine(Number.isFinite, 'Invalid playback position.').optional(),
 });
 
 const progressBatchSchema = z.object({
-  clientId: z.string().trim().min(1).max(80),
-  events: z.array(progressEventSchema).min(1).max(50),
+  clientId: clientIdSchema,
+  events: z
+    .array(progressEventSchema)
+    .min(1)
+    .max(50)
+    .refine((events) => {
+      const ids = new Set<string>();
+      let previous = 0;
+      for (const event of events) {
+        if (event.sequence <= previous || ids.has(event.clientEventId)) return false;
+        previous = event.sequence;
+        ids.add(event.clientEventId);
+      }
+      return true;
+    }, 'Events must have unique ids and strictly ascending sequences.'),
+  checksum: z.string().regex(/^[0-9a-f]{64}$/, 'Invalid progress batch checksum.'),
 });
 
 const quizAttemptSchema = z.object({
@@ -71,14 +105,30 @@ type LessonDetail = Awaited<ReturnType<typeof getLessonDetail>>;
 interface LearningRouterDeps {
   env: Env;
   db: DbClient;
+  mediaGrantLimiter: SlidingWindowRateLimiter;
 }
 
-function serializeMediaGrant(media: MediaGrantView) {
-  // The raw token is opaque, short-lived and scoped; the private provider
-  // reference / file id is never included in any client response.
-  const url = `/api/media/content?grant=${media.token}${
-    media.purpose === 'download' ? '&download=1' : ''
-  }`;
+function safeDigestEqual(left: string, right: string): boolean {
+  const a = Buffer.from(left, 'hex');
+  const b = Buffer.from(right, 'hex');
+  return a.length === 32 && b.length === 32 && timingSafeEqual(a, b);
+}
+
+function userAgentOf(req: Request): string | null {
+  const value = req.headers['user-agent'];
+  return typeof value === 'string' ? value : null;
+}
+
+function serializeMediaGrant(media: MediaGrantView, signingSecret: string) {
+  // Only the signed, short-lived URL and public asset metadata leave the API.
+  // Provider references, token internals and raw session IDs are never exposed.
+  const url = buildSignedMediaUrl({
+    token: media.token,
+    purpose: media.purpose,
+    expiresAt: media.expiresAt,
+    sessionId: media.sessionId,
+    signingSecret,
+  });
   return {
     url,
     expiresAt: media.expiresAt,
@@ -90,10 +140,11 @@ function serializeMediaGrant(media: MediaGrantView) {
   };
 }
 
-function serializePlayerState(state: PlayerState) {
+function serializePlayerState(state: PlayerState, viewer: ViewerWatermark) {
   const slug = state.course.slug;
   return {
     course: { ...state.course, href: `/learn/${slug}` },
+    viewer,
     criteriaVersion: state.criteriaVersion,
     criteria: state.criteria,
     progressPercent: state.progressPercent,
@@ -107,12 +158,19 @@ function serializePlayerState(state: PlayerState) {
   };
 }
 
-function serializeLessonDetail(detail: LessonDetail) {
+function serializeLessonDetail(
+  detail: LessonDetail,
+  viewer: ViewerWatermark,
+  signingSecret: string,
+) {
   const slug = detail.course.slug;
   const quizContent = detail.content as Extract<LessonDetail['content'], { kind: 'quiz' }>;
   const content =
     detail.content.kind === 'video' || detail.content.kind === 'download'
-      ? { kind: detail.content.kind, media: serializeMediaGrant(detail.content.media) }
+      ? {
+          kind: detail.content.kind,
+          media: serializeMediaGrant(detail.content.media, signingSecret),
+        }
       : detail.content.kind === 'text'
         ? { kind: 'text' as const, bodyText: detail.content.bodyText }
         : { kind: 'quiz' as const, quiz: quizContent.quiz };
@@ -120,6 +178,7 @@ function serializeLessonDetail(detail: LessonDetail) {
   return {
     lesson: { ...detail.lesson, href: `/learn/${slug}/${detail.lesson.id}` },
     course: { ...detail.course, href: `/learn/${slug}` },
+    viewer,
     criteriaVersion: detail.criteriaVersion,
     progress: detail.progress,
     completion: detail.completion,
@@ -134,7 +193,29 @@ function serializeLessonDetail(detail: LessonDetail) {
   };
 }
 
-export function createLearningRouter({ env, db }: LearningRouterDeps): Router {
+async function auditMediaGrant(
+  db: DbClient,
+  req: Request,
+  auth: AuthContext,
+  media: MediaGrantView,
+  lessonId: string,
+): Promise<void> {
+  await insertAuditEvent(db, {
+    actorUserId: auth.user.id,
+    action: 'media.grant_issued',
+    targetType: 'media_asset_grant',
+    targetId: media.grantId,
+    metadata: {
+      lessonId,
+      purpose: media.purpose,
+      expiresAt: media.expiresAt,
+      delivery: 'signed_web_url',
+    },
+    ipAddress: req.ip ?? null,
+  });
+}
+
+export function createLearningRouter({ env, db, mediaGrantLimiter }: LearningRouterDeps): Router {
   const router = Router();
 
   // --------------------------------------------------------------------------
@@ -150,7 +231,8 @@ export function createLearningRouter({ env, db }: LearningRouterDeps): Router {
         if (!auth) throw errors.unauthorized();
         const { slug } = getValidatedParams<z.infer<typeof slugParamsSchema>>(req);
         const state = await getCoursePlayerState(db, auth.user.id, slug);
-        res.json(serializePlayerState(state));
+        const viewer = buildViewerWatermark(auth, env.media.signingSecret);
+        res.json(serializePlayerState(state, viewer));
       } catch (error) {
         next(toAppError(error));
       }
@@ -196,8 +278,15 @@ export function createLearningRouter({ env, db }: LearningRouterDeps): Router {
         const auth = req.auth;
         if (!auth) throw errors.unauthorized();
         const { lessonId } = getValidatedParams<z.infer<typeof lessonParamsSchema>>(req);
-        const detail = await getLessonDetail(db, auth.user.id, lessonId);
-        res.json(serializeLessonDetail(detail));
+        const detail = await getLessonDetail(db, auth.user.id, lessonId, {
+          sessionId: auth.sessionId,
+          userAgent: userAgentOf(req),
+        });
+        if (detail.content.kind === 'video' || detail.content.kind === 'download') {
+          await auditMediaGrant(db, req, auth, detail.content.media, detail.lesson.id);
+        }
+        const viewer = buildViewerWatermark(auth, env.media.signingSecret);
+        res.json(serializeLessonDetail(detail, viewer, env.media.signingSecret));
       } catch (error) {
         next(toAppError(error));
       }
@@ -218,6 +307,29 @@ export function createLearningRouter({ env, db }: LearningRouterDeps): Router {
         if (!auth) throw errors.unauthorized();
         const { lessonId } = getValidatedParams<z.infer<typeof lessonParamsSchema>>(req);
         const body = req.body as z.infer<typeof progressBatchSchema>;
+
+        // Integrity check before any writes. This is not a browser-trust proof:
+        // server-side entitlement, unlock, sequences and reducer rules follow.
+        const expected = progressBatchChecksum({
+          clientId: body.clientId,
+          events: body.events,
+        });
+        if (!safeDigestEqual(body.checksum, expected)) {
+          await insertAuditEvent(db, {
+            actorUserId: auth.user.id,
+            action: 'progress.batch_rejected',
+            targetType: 'lesson',
+            targetId: lessonId,
+            metadata: { reason: 'integrity_digest_mismatch', clientId: body.clientId },
+            ipAddress: req.ip ?? null,
+          });
+          throw new AppError(
+            400,
+            'progress_checksum_invalid',
+            'The progress batch could not be verified. Please try again.',
+          );
+        }
+
         const context = await getLessonContext(db, auth.user.id, lessonId);
 
         if (
@@ -306,11 +418,16 @@ export function createLearningRouter({ env, db }: LearningRouterDeps): Router {
   );
 
   // --------------------------------------------------------------------------
-  // POST /api/learning/lessons/:lessonId/media — refresh a scoped delivery grant
+  // POST /api/learning/lessons/:lessonId/media — refresh a signed delivery grant
   // --------------------------------------------------------------------------
   router.post(
     '/learning/lessons/:lessonId/media',
     authenticate(env, db),
+    rateLimit({
+      limiter: mediaGrantLimiter,
+      keyOf: (req) => `media-grant:${req.auth?.user.id ?? 'anonymous'}:${req.params.lessonId ?? ''}`,
+      message: 'Too many secure media requests. Please try again shortly.',
+    }),
     validateParams(lessonParamsSchema),
     validateBody(mediaBodySchema),
     async (req: Request, res: Response, next: NextFunction) => {
@@ -324,8 +441,10 @@ export function createLearningRouter({ env, db }: LearningRouterDeps): Router {
           userId: auth.user.id,
           lessonId,
           purpose: body.purpose,
+          context: { sessionId: auth.sessionId, userAgent: userAgentOf(req) },
         });
-        res.json({ media: serializeMediaGrant(media) });
+        await auditMediaGrant(db, req, auth, media, lessonId);
+        res.json({ media: serializeMediaGrant(media, env.media.signingSecret) });
       } catch (error) {
         next(toAppError(error));
       }

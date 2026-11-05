@@ -31,3 +31,11 @@
 - Account recovery process.
 - Support access model and impersonation prohibition/controls.
 - Data retention and account deletion policy.
+
+## Phase 4 additions
+
+- `MEDIA_SIGNING_SECRET` is required explicitly in staging/production and derived from `JWT_SECRET` only in development/test.
+- Media grant and media content endpoints have separate rate limiters and audit events.
+- Signed URLs are bound to the authenticated session; a different session receives `media_session_mismatch` rather than access.
+- Anti-hotlink checks add no-store, noindex, `Vary` and `Cross-Origin-Resource-Policy` headers.
+- Session duration and concurrent session/device policy remain **Open**; Phase 4 does not implement a concurrent-session cap.

@@ -5,6 +5,7 @@ import App from './App.js';
 import { AuthProvider } from './auth/AuthProvider.js';
 import './styles/tokens.css';
 import './styles/app.css';
+import './styles/phase4.css';
 
 const container = document.getElementById('root');
 if (!container) {

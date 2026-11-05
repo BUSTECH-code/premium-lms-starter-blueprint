@@ -115,6 +115,8 @@ Do not claim a check passed unless it was actually run and its result observed.
 
 For visual work, inspect actual rendered browser screenshots at agreed viewport sizes. Compare against the reference pack and acceptance criteria. Fix obvious defects before reporting completion.
 
+> **Phase 4 exception (approved 2026-11-05):** DOM component tests, full typechecking and production build verification are the approved Phase 4 sign-off. Automated browser screenshots/viewport comparison were **Not run** for Phase 4 and must be reported as Not run; do not claim visual comparison. Native device registration and offline licensing are deferred, and no concurrent-session cap is implemented by Phase 4 web hardening.
+
 ## 9. Task completion report
 
 For every task, report:

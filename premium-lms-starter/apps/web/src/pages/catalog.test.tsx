@@ -42,6 +42,13 @@ describe('CatalogPage', () => {
     );
 
     expect(await screen.findByText('Node at Scale')).toBeTruthy();
+    expect(screen.getByTestId('catalog-page').getAttribute('data-responsive-layout')).toBe(
+      'stacked-mobile split-tablet grid-desktop',
+    );
+    expect(screen.getByTestId('catalog-hero')).toBeTruthy();
+    expect(screen.getByTestId('catalogue-filters')).toBeTruthy();
+    expect(screen.getByTestId('featured-course')).toBeTruthy();
+    expect(screen.getByTestId('featured-course-cover')).toBeTruthy();
     expect(screen.getByText('Ada Instructor · 2 modules · 6 lessons · 1h')).toBeTruthy();
     expect(screen.getByText(/45,000/)).toBeTruthy();
     expect(screen.getByRole('link', { name: 'View course' })).toHaveProperty(
@@ -91,5 +98,6 @@ describe('CatalogPage', () => {
     );
 
     expect(await screen.findByText(/No published courses match/)).toBeTruthy();
+    expect(screen.getByTestId('catalog-empty-state').getAttribute('data-state')).toBe('empty');
   });
 });

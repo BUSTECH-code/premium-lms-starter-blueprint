@@ -45,6 +45,14 @@ export interface GradebookView {
   entries: GradebookEntry[];
 }
 
+export interface ViewerWatermark {
+  email: string;
+  /** Opaque short session reference, never a raw session UUID. */
+  sessionRef: string;
+  /** Trusted server timestamp. */
+  issuedAt: string;
+}
+
 export interface CourseCriteria {
   version: number;
   policy: 'all_required_lessons';
@@ -80,6 +88,7 @@ export interface PlayerStateResponse {
     summary: string | null;
     href: string;
   };
+  viewer: ViewerWatermark;
   criteriaVersion: number;
   criteria: CourseCriteria;
   progressPercent: number;
@@ -146,6 +155,7 @@ export interface LessonDetailLesson {
 export interface LessonDetailResponse {
   lesson: LessonDetailLesson;
   course: { id: string; slug: string; title: string; href: string };
+  viewer: ViewerWatermark;
   criteriaVersion: number;
   progress: LessonProgressSnapshot;
   completion: CourseCompletionView;
@@ -171,6 +181,8 @@ export interface ProgressEventBody {
 export interface ProgressBatchBody {
   clientId: string;
   events: ProgressEventBody[];
+  /** SHA-256 integrity digest over clientId + explicitly ordered events. */
+  checksum: string;
 }
 
 export interface ProgressEventResult {

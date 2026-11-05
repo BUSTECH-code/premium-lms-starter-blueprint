@@ -156,3 +156,5 @@ responsive player and dashboard are implemented, and the requested unit, integra
 test scenarios pass. All four approved product decisions are enforced server-side and reflected in
 the UI. Phase 3 must still not be interpreted as including certificate issuance, real-device offline
 support, private Google Drive integration or browser visual sign-off.
+
+> **Phase 4 status update (2026-11-05):** the provisional-token note above is superseded. The exact editorial tokens are now **Confirmed** as the official Phase 4 baseline in `docs/design/design-system.md` and `apps/web/src/styles/tokens.css`. Phase 4 also adds shared editorial primitives, five responsive CSS bands and hardened media/sync behaviour; see `docs/implementation/phase-4-content-protection-and-design.md`.

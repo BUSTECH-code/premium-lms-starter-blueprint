@@ -80,6 +80,14 @@ describe('SimulatedCheckoutPage', () => {
     renderCheckout();
 
     expect(await screen.findByRole('heading', { name: 'Journey Course' })).toBeTruthy();
+    expect(screen.getByTestId('checkout-page').getAttribute('data-responsive-layout')).toBe(
+      'stacked-mobile split-tablet grid-desktop',
+    );
+    expect(screen.getByTestId('checkout-stepper')).toBeTruthy();
+    expect(screen.getByTestId('checkout-summary')).toBeTruthy();
+    expect(screen.getByTestId('checkout-status').getAttribute('data-state')).toBe(
+      'confirmation',
+    );
     expect(screen.getByText(/25,000/)).toBeTruthy();
     expect(screen.getByText(/simulated payment provider/i)).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Simulate successful payment' })).toBeTruthy();
@@ -98,6 +106,9 @@ describe('SimulatedCheckoutPage', () => {
     fireEvent.click(payButton);
 
     expect(await screen.findByRole('heading', { name: 'Access granted' })).toBeTruthy();
+    expect(screen.getByTestId('checkout-status').getAttribute('data-state')).toBe(
+      'confirmation',
+    );
     expect(screen.getByRole('link', { name: 'Open the course' })).toHaveProperty(
       'href',
       expect.stringContaining('/courses/journey-course'),
@@ -131,6 +142,7 @@ describe('SimulatedCheckoutPage', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Simulate failed payment' }));
 
     expect(await screen.findByRole('heading', { name: 'Payment failed' })).toBeTruthy();
+    expect(screen.getByTestId('checkout-status').getAttribute('data-state')).toBe('error');
     expect(
       screen.getByRole('button', { name: 'Retry with a successful payment' }),
     ).toBeTruthy();
@@ -155,6 +167,9 @@ describe('SimulatedCheckoutPage', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Simulate successful payment' }));
 
     expect(await screen.findByRole('heading', { name: 'Payment held for review' })).toBeTruthy();
+    expect(screen.getByTestId('checkout-status').getAttribute('data-state')).toBe(
+      'quarantined',
+    );
     expect(screen.queryByRole('heading', { name: 'Access granted' })).toBeNull();
   });
 
@@ -167,6 +182,9 @@ describe('SimulatedCheckoutPage', () => {
 
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: 'Checkout session not found' })).toBeTruthy();
+      expect(screen.getByTestId('checkout-not-found-state').getAttribute('data-state')).toBe(
+        'error',
+      );
     });
   });
 });

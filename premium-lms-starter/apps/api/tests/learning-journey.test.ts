@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import request from 'supertest';
+import { progressBatchChecksum, type CanonicalProgressEvent } from '@lms/shared';
 import { api, createTestApp, register, type TestApp } from './helpers.js';
 import {
   grantLearningAccess,
@@ -37,9 +38,13 @@ function event(
 }
 
 function progressBatch(lessonId: string, events: Record<string, unknown>[]) {
+  const checksum = progressBatchChecksum({
+    clientId: CLIENT_ID,
+    events: events as unknown as CanonicalProgressEvent[],
+  });
   return api(test.app, learnerJar)
     .post(`/api/learning/lessons/${lessonId}/progress/events`)
-    .send({ clientId: CLIENT_ID, events });
+    .send({ clientId: CLIENT_ID, events, checksum });
 }
 
 function completeExplicit(lessonId: string, sequence = 1) {
@@ -469,7 +474,9 @@ describe('Phase 3 learning journey (API integration)', () => {
     ]);
     expect(media.purpose).toBe('stream');
     expect(media.sizeBytes).toBe(fixture.byteLength);
-    expect(media.url).toMatch(/^\/api\/media\/content\?grant=[0-9a-f]{64}$/);
+    expect(media.url).toMatch(
+      /^\/api\/media\/content\?grant=[0-9a-f]{64}&purpose=stream&exp=\d+&sid=[0-9a-f]{12}&nonce=[0-9a-f]{32}&sig=[0-9a-f]{64}$/,
+    );
     const ttl = Date.parse(media.expiresAt) - Date.now();
     expect(ttl).toBeGreaterThan(240_000);
     expect(ttl).toBeLessThanOrEqual(300_000);
@@ -504,9 +511,11 @@ describe('Phase 3 learning journey (API integration)', () => {
     expect(invalidRange.body.error.code).toBe('invalid_range');
     expect(invalidRange.headers['content-range']).toBe(`bytes */${fixture.byteLength}`);
 
-    const mismatch = await api(test.app, learnerJar).get(`${url}&download=1`);
+    // Altering the signed purpose must fail before any grant resolution.
+    const tampered = url.replace('purpose=stream', 'purpose=download');
+    const mismatch = await api(test.app, learnerJar).get(tampered);
     expect(mismatch.status).toBe(403);
-    expect(mismatch.body.error.code).toBe('media_grant_invalid');
+    expect(mismatch.body.error.code).toBe('media_signature_invalid');
 
     const unauthenticated = await request(test.app).get(url);
     expect(unauthenticated.status).toBe(401);
@@ -514,7 +523,8 @@ describe('Phase 3 learning journey (API integration)', () => {
     const other = await register(test.app, { email: `media-other-${randomUUID().slice(0, 8)}@example.com` });
     const wrongUser = await api(test.app, other.jar).get(url);
     expect(wrongUser.status).toBe(403);
-    expect(wrongUser.body.error.code).toBe('media_grant_invalid');
+    // A different authenticated session has a different opaque signed-url reference.
+    expect(wrongUser.body.error.code).toBe('media_session_mismatch');
 
     const refreshed = await api(test.app, learnerJar)
       .post(`/api/learning/lessons/${seed.lessons[0]!.id}/media`)

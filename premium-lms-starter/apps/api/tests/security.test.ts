@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import request from 'supertest';
 import { ACCESS_COOKIE_NAME, REFRESH_COOKIE_NAME } from '../src/auth/cookies.js';
+import { buildSignedMediaUrl } from '../src/media/signing.js';
 import { createTestApp, login, register, type TestApp } from './helpers.js';
 
 let testApp: TestApp | undefined;
@@ -185,5 +186,44 @@ describe('error contract safety', () => {
     expect(real.status).toBe(fake.status);
     expect(real.body.error).toEqual(fake.body.error);
     expect(real.body.error.message).toBe('Invalid email or password.');
+  });
+});
+
+describe('Phase 4 media hardening', () => {
+  it('rejects an invalid signed media URL with no-store anti-hotlink headers', async () => {
+    testApp = await createTestApp();
+    const registration = await register(testApp.app, { email: 'media-headers@example.com' });
+    expect(registration.res.status).toBe(201);
+    const userId = registration.res.body.user.id as string;
+    const { rows } = await testApp.db.query<{ id: string }>(
+      'SELECT id::text FROM sessions WHERE user_id = $1',
+      [userId],
+    );
+    const sessionId = rows[0]?.id;
+    if (!sessionId) throw new Error('registration did not create a session');
+
+    const signed = buildSignedMediaUrl({
+      token: 'a'.repeat(64),
+      purpose: 'stream',
+      expiresAt: new Date(Date.now() + 60_000).toISOString(),
+      sessionId,
+      signingSecret: testApp.env.media.signingSecret,
+    });
+    const tampered = signed.replace(/sig=[0-9a-f]{64}/, `sig=${'0'.repeat(64)}`);
+
+    const res = await request(testApp.app)
+      .get(tampered)
+      .set('Cookie', registration.jar.header())
+      .set('Referer', 'http://localhost:5173/learn')
+      .set('Sec-Fetch-Site', 'same-origin')
+      .set('Sec-Fetch-Dest', 'video');
+
+    expect(res.status).toBe(403);
+    expect(res.body.error.code).toBe('media_signature_invalid');
+    expect(res.headers['cache-control']).toBe('no-store');
+    expect(res.headers['pragma']).toBe('no-cache');
+    expect(res.headers['x-robots-tag']).toContain('noindex');
+    expect(res.headers['cross-origin-resource-policy']).toBe('same-site');
+    expect(res.headers['vary']).toBeTruthy();
   });
 });

@@ -68,6 +68,14 @@ export function createApp({ env, db, logger }: AppDependencies): Express {
       env.rateLimit.checkout.maxAttempts,
       env.rateLimit.checkout.windowSeconds,
     ),
+    mediaGrant: new SlidingWindowRateLimiter(
+      env.rateLimit.mediaGrant.maxAttempts,
+      env.rateLimit.mediaGrant.windowSeconds,
+    ),
+    mediaContent: new SlidingWindowRateLimiter(
+      env.rateLimit.mediaContent.maxAttempts,
+      env.rateLimit.mediaContent.windowSeconds,
+    ),
   };
 
   app.use('/api/auth', createAuthRouter({ env, db, logger, limiters }));
@@ -77,8 +85,16 @@ export function createApp({ env, db, logger }: AppDependencies): Express {
     '/api',
     createCommerceRouter({ env, db, logger, checkoutLimiter: limiters.checkout }),
   );
-  app.use('/api', createLearningRouter({ env, db }));
-  app.use('/api', createMediaRouter({ env, db, provider: createMediaProvider() }));
+  app.use('/api', createLearningRouter({ env, db, mediaGrantLimiter: limiters.mediaGrant }));
+  app.use(
+    '/api',
+    createMediaRouter({
+      env,
+      db,
+      provider: createMediaProvider(),
+      contentLimiter: limiters.mediaContent,
+    }),
+  );
 
   app.use(notFoundHandler);
   app.use(errorHandler(logger));

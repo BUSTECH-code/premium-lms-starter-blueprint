@@ -167,3 +167,42 @@ describe('0004_learning_engine', () => {
     await expect(runMigrations(db)).rejects.toThrow(/modified after being applied/);
   });
 });
+
+describe('0005_phase4_content_protection', () => {
+  it('applies session-bound media grant columns and records the exact checksum', async () => {
+    const db = await openDb();
+    const result = await runMigrations(db);
+    expect(result.applied).toContain('0005_phase4_content_protection');
+
+    const migrations = await loadMigrations();
+    const file = migrations.find((m) => m.version === '0005_phase4_content_protection');
+    expect(file?.checksum).toMatch(/^[0-9a-f]{64}$/);
+    const { rows } = await db.query<{ version: string; checksum: string }>(
+      "SELECT version, checksum FROM schema_migrations WHERE version = '0005_phase4_content_protection'",
+    );
+    expect(rows[0]?.checksum).toBe(file?.checksum);
+
+    const { rows: columns } = await db.query<{ column_name: string }>(
+      `SELECT column_name FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = 'media_asset_grants'`,
+    );
+    const names = columns.map((column) => column.column_name);
+    for (const expected of [
+      'session_id',
+      'user_agent_hash',
+      'access_count',
+      'last_access_at',
+    ]) {
+      expect(names).toContain(expected);
+    }
+  });
+
+  it('detects tampering with the applied Phase 4 migration checksum', async () => {
+    const db = await openDb();
+    await runMigrations(db);
+    await db.query(
+      "UPDATE schema_migrations SET checksum = 'tampered' WHERE version = '0005_phase4_content_protection'",
+    );
+    await expect(runMigrations(db)).rejects.toThrow(/modified after being applied/);
+  });
+});

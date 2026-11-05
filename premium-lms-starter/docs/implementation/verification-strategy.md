@@ -70,3 +70,25 @@ Do not substitute a successful build for functional verification. Do not substit
 
 See `docs/implementation/phase-3-learning-and-progress.md` for the full completion report and
 still-open decisions.
+
+## Phase 4 evidence status (2026-11-05)
+
+- `npm run migrate`: **Passed** — `0005_phase4_content_protection` applied; `0001_init`,
+  `0002_rbac_seed`, `0003_catalog_checkout` and `0004_learning_engine` already applied. Applied
+  checksum/column/tamper tests for 0005 are included in the suite.
+- `npm test`: **Passed** — `29 files / 258 tests`. Includes signed media delivery, hotlink and
+  signature denial, media rate limits, audit content, progress checksum/quarantine, migration
+  checks, full learning journey, DOM component tests for the five requested views, shared UI/state
+  primitives and CSS/token/responsive-band tests.
+- `npm run typecheck`: **Passed** — `tsc -b && npm run typecheck -w @lms/web`.
+- `npm run build`: **Passed** — Vite v8.3.6, 45 modules, CSS `37.92 kB` (gzip `6.83 kB`), JS
+  `329.51 kB` (gzip `100.69 kB`).
+- `npm run seed:fixtures`: **Passed** — idempotent `0/0/0` new fixtures.
+- Automated browser screenshots, rendered viewport comparison, keyboard/focus browser inspection
+  and visual acceptance report: **Not run**. Approved Phase 4 sign-off uses DOM component tests,
+  full typechecking and production build verification; no visual comparison is claimed.
+- Real-device offline playback/licence renewal, native device registration and certificate
+  issuance: **Not run / out of scope / deferred**.
+
+See `docs/implementation/phase-4-content-protection-and-design.md` for the full completion report
+and still-open decisions.

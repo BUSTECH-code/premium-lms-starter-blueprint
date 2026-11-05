@@ -3,7 +3,11 @@ import type { DbClient } from '../client.js';
 import type { MediaAssetRow } from '../types.js';
 import { LearningError } from './learning-errors.js';
 
-/** Short-lived scoped grants: 5 minutes, re-checked against entitlement + unlock. */
+/**
+ * Short-lived, session-bound scoped grants: 5 minutes, re-checked against
+ * entitlement + sequential unlock on every delivery. Range requests from the
+ * same authenticated session and user agent may reuse a grant until expiry.
+ */
 export const MEDIA_GRANT_TTL_SECONDS = 300;
 
 export interface MediaAssetPublic {
@@ -19,6 +23,10 @@ export interface MediaGrantView {
   expiresAt: string;
   purpose: 'stream' | 'download';
   asset: MediaAssetPublic;
+  /** Internal only — never serialized into a client response. */
+  grantId: string;
+  sessionId: string;
+  userAgentHash: string;
 }
 
 export interface LessonMediaAsset {
@@ -33,6 +41,14 @@ export interface ResolvedMediaGrant {
   purpose: 'stream' | 'download';
   expiresAt: Date | string;
   asset: MediaAssetRow;
+  grantId: string;
+  /** 1 on the first successful resolution; used to audit one access per grant. */
+  accessCount: number;
+}
+
+export interface MediaGrantContext {
+  sessionId: string;
+  userAgent: string | null | undefined;
 }
 
 function sha256Hex(value: string): string {
@@ -41,6 +57,15 @@ function sha256Hex(value: string): string {
 
 export function hashMediaGrantToken(token: string): string {
   return sha256Hex(token);
+}
+
+export function normaliseUserAgent(value: string | null | undefined): string {
+  return (value ?? '').trim().toLowerCase();
+}
+
+/** Opaque binding hash; no raw user-agent string is stored. */
+export function hashMediaUserAgent(value: string | null | undefined): string {
+  return sha256Hex(`lms.media.user-agent.v1\u001f${normaliseUserAgent(value)}`);
 }
 
 function toIso(value: unknown): string {
@@ -88,6 +113,7 @@ export async function createMediaGrant(
     userId: string;
     lessonId: string;
     purpose: 'stream' | 'download';
+    context: MediaGrantContext;
   },
 ): Promise<MediaGrantView> {
   const { rows: lessonRows } = await db.query<{ kind: string; asset_id: string | null }>(
@@ -118,11 +144,13 @@ export async function createMediaGrant(
   }
 
   const token = randomBytes(32).toString('hex');
-  const { rows } = await db.query<{ expires_at: Date | string }>(
+  const userAgentHash = hashMediaUserAgent(input.context.userAgent);
+  const { rows } = await db.query<{ id: string; expires_at: Date | string }>(
     `INSERT INTO media_asset_grants
-       (token_hash, user_id, lesson_id, asset_id, purpose, expires_at)
-     VALUES ($1, $2, $3, $4, $5, now() + make_interval(secs => $6))
-     RETURNING expires_at`,
+       (token_hash, user_id, lesson_id, asset_id, purpose, expires_at,
+        session_id, user_agent_hash)
+     VALUES ($1, $2, $3, $4, $5, now() + make_interval(secs => $6), $7, $8)
+     RETURNING id::text, expires_at`,
     [
       sha256Hex(token),
       input.userId,
@@ -130,65 +158,113 @@ export async function createMediaGrant(
       asset.assetId,
       input.purpose,
       MEDIA_GRANT_TTL_SECONDS,
+      input.context.sessionId,
+      userAgentHash,
     ],
   );
-  const expiresAt = rows[0]?.expires_at;
-  if (!expiresAt) throw new Error('Media grant insert returned no row');
+  const inserted = rows[0];
+  if (!inserted) throw new Error('Media grant insert returned no row');
 
   return {
     token,
-    expiresAt: toIso(expiresAt),
+    expiresAt: toIso(inserted.expires_at),
     purpose: input.purpose,
     asset: asset.public,
+    grantId: inserted.id,
+    sessionId: input.context.sessionId,
+    userAgentHash,
   };
 }
 
 /**
- * Resolve an opaque grant token for delivery. The API MUST additionally call
- * `getLessonContext` to re-verify the entitlement and sequential unlock.
+ * Atomically resolve an opaque grant token for delivery. The API MUST also
+ * call `getLessonContext` to re-verify entitlement and sequential unlock, and
+ * verify the signed URL before calling this repository.
  */
 export async function resolveMediaGrant(
   db: DbClient,
-  token: string,
-  userId: string,
+  input: {
+    token: string;
+    userId: string;
+    sessionId: string;
+    userAgent: string | null | undefined;
+  },
 ): Promise<ResolvedMediaGrant> {
-  const { rows } = await db.query<
-    MediaAssetRow & {
-      lesson_id: string;
-      course_slug: string;
-      grant_purpose: 'stream' | 'download';
-      grant_expires_at: Date | string;
+  return db.transaction(async (tx) => {
+    const { rows } = await tx.query<
+      MediaAssetRow & {
+        grant_id: string;
+        lesson_id: string;
+        course_slug: string;
+        grant_purpose: 'stream' | 'download';
+        grant_expires_at: Date | string;
+        access_count: string;
+      }
+    >(
+      `SELECT ${MEDIA_ASSET_COLUMNS},
+              g.id::text AS grant_id,
+              g.lesson_id::text AS lesson_id,
+              c.slug AS course_slug,
+              g.purpose AS grant_purpose,
+              g.expires_at AS grant_expires_at,
+              g.access_count::text AS access_count
+         FROM media_asset_grants g
+         JOIN lessons l ON l.id = g.lesson_id
+         JOIN modules m ON m.id = l.module_id
+         JOIN courses c ON c.id = m.course_id
+         JOIN lesson_content lc ON lc.lesson_id = g.lesson_id AND lc.asset_id = g.asset_id
+         JOIN media_assets ma ON ma.id = g.asset_id
+        WHERE g.token_hash = $1
+          AND g.user_id = $2
+          AND g.session_id = $3
+          AND g.user_agent_hash = $4
+        FOR UPDATE OF g`,
+      [
+        sha256Hex(input.token),
+        input.userId,
+        input.sessionId,
+        hashMediaUserAgent(input.userAgent),
+      ],
+    );
+    const row = rows[0];
+    if (!row) {
+      throw new LearningError('media_grant_invalid', 'This media link is not valid.');
     }
-  >(
-    `SELECT ${MEDIA_ASSET_COLUMNS},
-            g.lesson_id, c.slug AS course_slug,
-            g.purpose AS grant_purpose, g.expires_at AS grant_expires_at
-       FROM media_asset_grants g
-       JOIN lessons l ON l.id = g.lesson_id
-       JOIN modules m ON m.id = l.module_id
-       JOIN courses c ON c.id = m.course_id
-       JOIN lesson_content lc ON lc.lesson_id = g.lesson_id AND lc.asset_id = g.asset_id
-       JOIN media_assets ma ON ma.id = g.asset_id
-      WHERE g.token_hash = $1 AND g.user_id = $2`,
-    [sha256Hex(token), userId],
-  );
-  const row = rows[0];
-  if (!row) {
-    throw new LearningError('media_grant_invalid', 'This media link is not valid.');
-  }
-  const expires = row.grant_expires_at instanceof Date
-    ? row.grant_expires_at
-    : new Date(String(row.grant_expires_at));
-  if (expires.getTime() <= Date.now()) {
-    throw new LearningError('media_grant_expired', 'This media link has expired. Request a new one.');
-  }
+    const expires = row.grant_expires_at instanceof Date
+      ? row.grant_expires_at
+      : new Date(String(row.grant_expires_at));
+    if (expires.getTime() <= Date.now()) {
+      throw new LearningError(
+        'media_grant_expired',
+        'This media link has expired. Request a new one.',
+      );
+    }
 
-  const {
-    lesson_id: lessonId,
-    course_slug: courseSlug,
-    grant_purpose: purpose,
-    grant_expires_at: expiresAt,
-    ...asset
-  } = row;
-  return { lessonId, courseSlug, purpose, expiresAt, asset: asset as MediaAssetRow };
+    const accessCount = Number(row.access_count) + 1;
+    await tx.query(
+      `UPDATE media_asset_grants
+          SET access_count = $2, last_access_at = now()
+        WHERE id = $1`,
+      [row.grant_id, accessCount],
+    );
+
+    const {
+      grant_id: grantId,
+      lesson_id: lessonId,
+      course_slug: courseSlug,
+      grant_purpose: purpose,
+      grant_expires_at: expiresAt,
+      access_count: _accessCount,
+      ...asset
+    } = row;
+    return {
+      grantId,
+      lessonId,
+      courseSlug,
+      purpose,
+      expiresAt,
+      asset: asset as MediaAssetRow,
+      accessCount,
+    };
+  });
 }

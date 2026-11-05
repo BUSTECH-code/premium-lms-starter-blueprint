@@ -1,5 +1,10 @@
+import { fileURLToPath } from 'node:url';
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
+
+const sharedSource = fileURLToPath(
+  new URL('../../packages/shared/src/index.ts', import.meta.url),
+);
 
 // Dev server configuration.
 // - `host: true` + `allowedHosts: true` so the sandbox preview host can reach it.
@@ -8,6 +13,11 @@ import { defineConfig } from 'vite';
 //   requests that arrived through this proxy.
 export default defineConfig({
   plugins: [react()],
+  resolve: {
+    alias: {
+      '@lms/shared': sharedSource,
+    },
+  },
   server: {
     host: true,
     port: 5173,
