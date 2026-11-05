@@ -69,6 +69,11 @@ Target duration: 90 days. Renewal requires online authorization. Exact expiry be
 
 Completion definition must be explicit. Do not infer completion merely from a download or page visit.
 
+**Phase 3 implementation:** `not_started → in_progress → completed`; `completed` is terminal. Only
+an explicit `complete` event (video/text/download) or a server-generated `quiz_passed` event can
+complete a lesson. Stale client sequences never overwrite newer server progress. See
+`docs/implementation/phase-3-learning-and-progress.md`.
+
 ## Course completion
 - Not Eligible
 - In Progress
@@ -76,6 +81,11 @@ Completion definition must be explicit. Do not infer completion merely from a do
 - Certificate Issued (certificate may be a separate record/state)
 
 Completion criteria are configurable per course as a recommended baseline. Exact criteria remain open.
+
+**Phase 3 implementation:** the active rule version is frozen on enrolment; all required lessons
+must be complete and every quiz must be passed. `completed` is recorded, but
+`certificate_issued` is deliberately never written in Phase 3 (`frozen_no_certificate`). Certificate
+design/verification remains open.
 
 ## Device
 - Active

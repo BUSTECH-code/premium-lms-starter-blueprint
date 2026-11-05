@@ -1,3 +1,7 @@
+import { createHash } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import type { DbClient } from '@lms/db';
 
 let counter = 0;
@@ -108,4 +112,253 @@ export async function grantEntitlement(
      ON CONFLICT (user_id, course_id) DO NOTHING`,
     [userId, courseId, source],
   );
+}
+
+/** Enrol a learner (the enrolment trigger freezes the active criteria version). */
+export async function enrollUser(
+  db: DbClient,
+  userId: string,
+  courseId: string,
+): Promise<void> {
+  await db.query(
+    `INSERT INTO enrollments (user_id, course_id, status) VALUES ($1, $2, 'active')
+     ON CONFLICT (user_id, course_id) DO NOTHING`,
+    [userId, courseId],
+  );
+}
+
+/** Entitlement + enrolment, i.e. the state a verified purchase produces. */
+export async function grantLearningAccess(
+  db: DbClient,
+  userId: string,
+  courseId: string,
+): Promise<void> {
+  await grantEntitlement(db, userId, courseId);
+  await enrollUser(db, userId, courseId);
+}
+
+const FIXTURE_DIR = fileURLToPath(new URL('../assets/fixtures', import.meta.url));
+
+interface FixtureAssetIds {
+  video: string;
+  pdf: string;
+}
+
+async function ensureFixtureAssets(db: DbClient): Promise<FixtureAssetIds> {
+  const specs = [
+    {
+      key: 'video' as const,
+      reference: 'lesson-intro.mp4',
+      mimeType: 'video/mp4',
+      fileName: 'Lesson introduction (test fixture).mp4',
+      durationSeconds: 4,
+    },
+    {
+      key: 'pdf' as const,
+      reference: 'lesson-notes.pdf',
+      mimeType: 'application/pdf',
+      fileName: 'Lesson notes (test fixture).pdf',
+      durationSeconds: null,
+    },
+  ];
+  const ids = {} as FixtureAssetIds;
+  for (const spec of specs) {
+    const bytes = await readFile(path.join(FIXTURE_DIR, spec.reference));
+    const checksum = createHash('sha256').update(bytes).digest('hex');
+    const { rows } = await db.query<{ id: string }>(
+      `INSERT INTO media_assets
+         (provider, provider_reference, mime_type, file_name, file_size_bytes,
+          checksum_sha256, duration_seconds, version)
+       VALUES ('local_fixture', $1, $2, $3, $4, $5, $6, 1)
+       ON CONFLICT (provider, provider_reference, version) DO UPDATE SET
+         file_size_bytes = EXCLUDED.file_size_bytes,
+         checksum_sha256 = EXCLUDED.checksum_sha256,
+         updated_at = now()
+       RETURNING id::text`,
+      [
+        spec.reference,
+        spec.mimeType,
+        spec.fileName,
+        bytes.byteLength,
+        checksum,
+        spec.durationSeconds,
+      ],
+    );
+    const id = rows[0]?.id;
+    if (!id) throw new Error('fixture media insert failed');
+    ids[spec.key] = id;
+  }
+  return ids;
+}
+
+export interface LearningLessonSeed {
+  id: string;
+  kind: 'video' | 'text' | 'quiz' | 'download';
+  title: string;
+}
+
+export interface LearningCourseSeed {
+  id: string;
+  slug: string;
+  title: string;
+  lessons: LearningLessonSeed[];
+  quizId: string;
+  /** Server-side answer key for tests only — never exposed by the API. */
+  correctAnswers: Record<string, string[]>;
+  wrongAnswers: Record<string, string[]>;
+  assetIds: FixtureAssetIds;
+}
+
+interface SeedLearningCourseOptions {
+  createdBy: string;
+  slug?: string;
+  title?: string;
+  priceAmount?: string;
+  status?: string;
+}
+
+/**
+ * A complete four-lesson course (video → text → quiz → download) across two
+ * modules, with private local-fixture media and an objective quiz. Used by the
+ * learning journey / state-machine / media-delivery tests.
+ */
+export async function seedLearningCourse(
+  db: DbClient,
+  options: SeedLearningCourseOptions,
+): Promise<LearningCourseSeed> {
+  counter += 1;
+  const slug = options.slug ?? `learning-course-${counter}-${Date.now()}`;
+  const title = options.title ?? `Learning Course ${counter}`;
+  const status = options.status ?? 'published';
+  const assets = await ensureFixtureAssets(db);
+
+  const { rows: courseRows } = await db.query<{ id: string }>(
+    `INSERT INTO courses (slug, title, summary, description, status, created_by,
+                          published_at, price_amount, price_currency, tags)
+     VALUES ($1, $2, $3, $4, $5, $6,
+             CASE WHEN $5 = 'published' THEN now() ELSE NULL END,
+             $7, 'NGN', '{"fixture"}'::text[])
+     RETURNING id::text`,
+    [
+      slug,
+      title,
+      '[Test fixture] A learning engine course.',
+      'Test fixture course for Phase 3 learning and progress tests.',
+      status,
+      options.createdBy,
+      options.priceAmount ?? '25000.00',
+    ],
+  );
+  const courseId = courseRows[0]?.id;
+  if (!courseId) throw new Error('learning course seed failed');
+
+  const moduleSpecs = [
+    { title: 'Module one', position: 1 },
+    { title: 'Module two', position: 2 },
+  ];
+  const moduleIds: string[] = [];
+  for (const module of moduleSpecs) {
+    const { rows } = await db.query<{ id: string }>(
+      `INSERT INTO modules (course_id, title, position) VALUES ($1, $2, $3) RETURNING id::text`,
+      [courseId, module.title, module.position],
+    );
+    const id = rows[0]?.id;
+    if (!id) throw new Error('module seed failed');
+    moduleIds.push(id);
+  }
+
+  const lessonSpecs: { title: string; kind: LearningLessonSeed['kind']; moduleIndex: number; position: number; duration: number }[] = [
+    { title: 'Watch the introduction', kind: 'video', moduleIndex: 0, position: 1, duration: 4 },
+    { title: 'Read the notes', kind: 'text', moduleIndex: 0, position: 2, duration: 180 },
+    { title: 'Check your understanding', kind: 'quiz', moduleIndex: 1, position: 1, duration: 300 },
+    { title: 'Download the companion PDF', kind: 'download', moduleIndex: 1, position: 2, duration: 120 },
+  ];
+  const lessons: LearningLessonSeed[] = [];
+  for (const spec of lessonSpecs) {
+    const moduleId = moduleIds[spec.moduleIndex];
+    const { rows } = await db.query<{ id: string }>(
+      `INSERT INTO lessons (module_id, title, position, duration_seconds, kind)
+       VALUES ($1, $2, $3, $4, $5) RETURNING id::text`,
+      [moduleId, spec.title, spec.position, spec.duration, spec.kind],
+    );
+    const id = rows[0]?.id;
+    if (!id) throw new Error('lesson seed failed');
+    lessons.push({ id, kind: spec.kind, title: spec.title });
+  }
+
+  const [videoLesson, textLesson, quizLesson, downloadLesson] = lessons;
+  if (!videoLesson || !textLesson || !quizLesson || !downloadLesson) {
+    throw new Error('lesson seed incomplete');
+  }
+
+  await db.query(
+    `INSERT INTO lesson_content (lesson_id, asset_id) VALUES ($1, $2), ($3, $4)
+     ON CONFLICT (lesson_id) DO NOTHING`,
+    [videoLesson.id, assets.video, downloadLesson.id, assets.pdf],
+  );
+  await db.query(
+    `INSERT INTO lesson_content (lesson_id, body_text) VALUES ($1, $2)
+     ON CONFLICT (lesson_id) DO NOTHING`,
+    [
+      textLesson.id,
+      '[Test fixture] Read these short notes. Opening or downloading content does not complete a lesson; use the explicit completion action.',
+    ],
+  );
+
+  const { rows: quizRows } = await db.query<{ id: string }>(
+    `INSERT INTO quizzes (lesson_id, title, instructions)
+     VALUES ($1, 'Checkpoint', 'Test fixture quiz. Answer every question.')
+     RETURNING id::text`,
+    [quizLesson.id],
+  );
+  const quizId = quizRows[0]?.id;
+  if (!quizId) throw new Error('quiz seed failed');
+
+  const questions = [
+    {
+      position: 1,
+      kind: 'single_choice',
+      prompt: 'Which state is terminal for lesson progress?',
+      choices: [
+        { id: 'a', text: 'Not started', isCorrect: false },
+        { id: 'b', text: 'In progress', isCorrect: false },
+        { id: 'c', text: 'Completed', isCorrect: true },
+      ],
+    },
+    {
+      position: 2,
+      kind: 'true_false',
+      prompt: 'A download completes a lesson by itself.',
+      choices: [
+        { id: 'true', text: 'True', isCorrect: false },
+        { id: 'false', text: 'False', isCorrect: true },
+      ],
+    },
+    {
+      position: 3,
+      kind: 'multiple_choice',
+      prompt: 'Select the approved completion actions.',
+      choices: [
+        { id: 'a', text: 'Explicit mark complete', isCorrect: true },
+        { id: 'b', text: 'Passing a quiz', isCorrect: true },
+        { id: 'c', text: 'Page visit', isCorrect: false },
+        { id: 'd', text: 'Download', isCorrect: false },
+      ],
+    },
+  ];
+  const correctAnswers: Record<string, string[]> = {};
+  const wrongAnswers: Record<string, string[]> = {};
+  for (const question of questions) {
+    const { rows } = await db.query<{ id: string }>(
+      `INSERT INTO quiz_questions (quiz_id, position, kind, prompt, points, choices)
+       VALUES ($1, $2, $3, $4, 1, $5::jsonb) RETURNING id::text`,
+      [quizId, question.position, question.kind, question.prompt, JSON.stringify(question.choices)],
+    );
+    const id = rows[0]?.id;
+    if (!id) throw new Error('quiz question seed failed');
+    correctAnswers[id] = question.choices.filter((choice) => choice.isCorrect).map((choice) => choice.id);
+    wrongAnswers[id] = question.choices.filter((choice) => !choice.isCorrect).map((choice) => choice.id);
+  }
+
+  return { id: courseId, slug, title, lessons, quizId, correctAnswers, wrongAnswers, assetIds: assets };
 }

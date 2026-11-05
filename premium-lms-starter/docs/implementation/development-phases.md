@@ -1,4 +1,12 @@
-# Development Phases — Proposed Sequence
+# Development Phases — Historical Proposed Sequence
+
+> **Active implementation note (2026-11-05).** The active Phase 3 prompt defines Phase 3 as the
+> learning/progress engine after the already-implemented Phase 1 foundation and Phase 2
+> catalogue/checkout/enrolment work. This historical file lists content management as Phase 3,
+> commerce as Phase 4 and student learning as Phase 5. The active prompt takes precedence: the
+> learning/progress engine is implemented and verified as **Phase 3** in
+> `docs/implementation/phase-3-learning-and-progress.md`. Phase 4+ (mobile/offline devices,
+> operations, certificates and public-site polish) is not started.
 
 Do not begin all phases at once. Each phase requires approved scope and acceptance criteria.
 
@@ -30,7 +38,19 @@ Exit: secure foundation with automated checks.
 
 Exit: accurate course discovery with premium visual acceptance.
 
-## Phase 3 — Course content management
+## Active Phase 3 — Learning & progress (implemented)
+
+- Responsive student course player and learning dashboard.
+- Server-authoritative lesson state machine and sequential unlocks.
+- Offline-safe progress sync with exact-once/stale/duplicate handling.
+- Objective quiz auto-grading, best-score gradebook and frozen course completion rules.
+- Authorized short-lived scoped grants for local development media.
+- No certificate issuance (approved Q4).
+
+Exit: end-to-end learner journey verified by unit, integration and DOM tests; see
+`docs/implementation/phase-3-learning-and-progress.md`. Browser visual acceptance was not run.
+
+## Historical Phase 3 — Course content management
 - Course/module/lesson management.
 - Media asset metadata and private provider integration.
 - Draft/review/publish workflow as approved.

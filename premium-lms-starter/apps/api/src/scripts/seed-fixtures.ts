@@ -1,3 +1,7 @@
+import { createHash } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { createDatabase, runMigrations, type DbClient } from '@lms/db';
 import { loadEnv } from '../config/env.js';
 
@@ -202,7 +206,233 @@ const COURSES: CourseFixture[] = [
   },
 ];
 
-async function seed(db: DbClient): Promise<{ courses: number; categories: number }> {
+// ---------------------------------------------------------------------------
+// Phase 3 learning fixtures (approved Q1 local_authorized_fixtures)
+// ---------------------------------------------------------------------------
+
+const FIXTURE_DIR = fileURLToPath(new URL('../../assets/fixtures', import.meta.url));
+const LESSON_KINDS = ['video', 'text', 'quiz', 'download'] as const;
+type FixtureLessonKind = (typeof LESSON_KINDS)[number];
+
+interface FixtureMedia {
+  key: 'video' | 'pdf';
+  reference: string;
+  mimeType: string;
+  fileName: string;
+  durationSeconds: number | null;
+}
+
+const FIXTURE_MEDIA: FixtureMedia[] = [
+  {
+    key: 'video',
+    reference: 'lesson-intro.mp4',
+    mimeType: 'video/mp4',
+    fileName: 'Lesson introduction (development fixture).mp4',
+    durationSeconds: 4,
+  },
+  {
+    key: 'pdf',
+    reference: 'lesson-notes.pdf',
+    mimeType: 'application/pdf',
+    fileName: 'Lesson notes (development fixture).pdf',
+    durationSeconds: null,
+  },
+];
+
+interface FixtureQuizQuestion {
+  position: number;
+  kind: 'single_choice' | 'multiple_choice' | 'true_false';
+  prompt: string;
+  choices: { id: string; text: string; isCorrect: boolean }[];
+}
+
+const QUIZ_QUESTIONS: FixtureQuizQuestion[] = [
+  {
+    position: 1,
+    kind: 'single_choice',
+    prompt: 'Which progress state means a lesson has never been opened?',
+    choices: [
+      { id: 'a', text: 'Not started', isCorrect: true },
+      { id: 'b', text: 'In progress', isCorrect: false },
+      { id: 'c', text: 'Completed', isCorrect: false },
+    ],
+  },
+  {
+    position: 2,
+    kind: 'single_choice',
+    prompt: 'What completes an ordinary video, text or download lesson under the approved rule?',
+    choices: [
+      { id: 'a', text: 'Opening the page', isCorrect: false },
+      { id: 'b', text: 'Downloading a file', isCorrect: false },
+      { id: 'c', text: 'An explicit “Mark complete” action', isCorrect: true },
+      { id: 'd', text: 'Reaching 90% watched automatically', isCorrect: false },
+    ],
+  },
+  {
+    position: 3,
+    kind: 'multiple_choice',
+    prompt: 'Select all lesson kinds supported by this fixture player.',
+    choices: [
+      { id: 'a', text: 'Video', isCorrect: true },
+      { id: 'b', text: 'Text', isCorrect: true },
+      { id: 'c', text: 'Quiz', isCorrect: true },
+      { id: 'd', text: 'Download', isCorrect: true },
+      { id: 'e', text: 'Live tutoring', isCorrect: false },
+    ],
+  },
+  {
+    position: 4,
+    kind: 'true_false',
+    prompt: 'A downloaded lesson is automatically a completed lesson.',
+    choices: [
+      { id: 'true', text: 'True', isCorrect: false },
+      { id: 'false', text: 'False', isCorrect: true },
+    ],
+  },
+  {
+    position: 5,
+    kind: 'single_choice',
+    prompt: 'What happens when an older offline progress event arrives after newer progress?',
+    choices: [
+      { id: 'a', text: 'It overwrites the newer state', isCorrect: false },
+      { id: 'b', text: 'It is ignored as stale', isCorrect: true },
+      { id: 'c', text: 'It unlocks every lesson', isCorrect: false },
+      { id: 'd', text: 'It deletes server progress', isCorrect: false },
+    ],
+  },
+];
+
+interface LessonSeedRow {
+  id: string;
+  kind: string;
+  lesson_title: string;
+  has_content: boolean;
+  has_quiz: boolean;
+}
+
+async function ensureMediaAssets(db: DbClient): Promise<Record<FixtureMedia['key'], string>> {
+  const ids = {} as Record<FixtureMedia['key'], string>;
+  for (const media of FIXTURE_MEDIA) {
+    const bytes = await readFile(path.join(FIXTURE_DIR, media.reference));
+    const checksum = createHash('sha256').update(bytes).digest('hex');
+    const { rows } = await db.query<{ id: string }>(
+      `INSERT INTO media_assets
+         (provider, provider_reference, mime_type, file_name, file_size_bytes,
+          checksum_sha256, duration_seconds, version)
+       VALUES ('local_fixture', $1, $2, $3, $4, $5, $6, 1)
+       ON CONFLICT (provider, provider_reference, version) DO UPDATE SET
+         mime_type = EXCLUDED.mime_type,
+         file_name = EXCLUDED.file_name,
+         file_size_bytes = EXCLUDED.file_size_bytes,
+         checksum_sha256 = EXCLUDED.checksum_sha256,
+         duration_seconds = EXCLUDED.duration_seconds,
+         updated_at = now()
+       RETURNING id::text`,
+      [
+        media.reference,
+        media.mimeType,
+        media.fileName,
+        bytes.byteLength,
+        checksum,
+        media.durationSeconds,
+      ],
+    );
+    const id = rows[0]?.id;
+    if (!id) throw new Error(`Could not seed media fixture ${media.reference}`);
+    ids[media.key] = id;
+  }
+  return ids;
+}
+
+async function ensureQuizQuestions(db: DbClient, quizId: string): Promise<void> {
+  for (const question of QUIZ_QUESTIONS) {
+    await db.query(
+      `INSERT INTO quiz_questions (quiz_id, position, kind, prompt, points, choices)
+       VALUES ($1, $2, $3, $4, 1, $5::jsonb)
+       ON CONFLICT (quiz_id, position) DO NOTHING`,
+      [quizId, question.position, question.kind, question.prompt, JSON.stringify(question.choices)],
+    );
+  }
+}
+
+/** Assign a deterministic mix of the four approved lesson kinds + content. */
+async function seedLearningContent(db: DbClient): Promise<number> {
+  const mediaIds = await ensureMediaAssets(db);
+  const { rows } = await db.query<LessonSeedRow>(
+    `SELECT l.id::text, l.kind, l.title AS lesson_title,
+            EXISTS (SELECT 1 FROM lesson_content lc WHERE lc.lesson_id = l.id) AS has_content,
+            EXISTS (SELECT 1 FROM quizzes q WHERE q.lesson_id = l.id) AS has_quiz
+       FROM lessons l JOIN modules m ON m.id = l.module_id
+       JOIN courses c ON c.id = m.course_id
+      ORDER BY c.slug, m.position, l.position`,
+  );
+
+  let configured = 0;
+  for (const [index, lesson] of rows.entries()) {
+    const kind: FixtureLessonKind = LESSON_KINDS[index % LESSON_KINDS.length] ?? 'video';
+    if (lesson.has_content || lesson.has_quiz) continue;
+
+    if (lesson.kind !== kind) {
+      // The schema forbids changing a lesson kind after content exists; these
+      // rows have neither content nor a quiz, so the assignment is safe.
+      await db.query('UPDATE lessons SET kind = $2 WHERE id = $1', [lesson.id, kind]);
+    }
+
+    if (kind === 'video' || kind === 'download') {
+      await db.query(
+        `INSERT INTO lesson_content (lesson_id, asset_id) VALUES ($1, $2)
+         ON CONFLICT (lesson_id) DO NOTHING`,
+        [lesson.id, kind === 'video' ? mediaIds.video : mediaIds.pdf],
+      );
+    } else if (kind === 'text') {
+      await db.query(
+        `INSERT INTO lesson_content (lesson_id, body_text) VALUES ($1, $2)
+         ON CONFLICT (lesson_id) DO NOTHING`,
+        [
+          lesson.id,
+          `[Development fixture] ${lesson.lesson_title}\n\n` +
+            'These notes are a local fixture for the learning player. They contain no real ' +
+            'course material. Read them, then mark the lesson complete when you are ready.',
+        ],
+      );
+    } else {
+      const { rows: quizRows } = await db.query<{ id: string }>(
+        `INSERT INTO quizzes (lesson_id, title, instructions)
+         VALUES ($1, $2, $3)
+         ON CONFLICT (lesson_id) DO NOTHING RETURNING id::text`,
+        [
+          lesson.id,
+          `Checkpoint: ${lesson.lesson_title}`,
+          'Development fixture quiz. Objective questions are auto-graded; the passing score comes from your frozen course completion rules.',
+        ],
+      );
+      let quizId = quizRows[0]?.id;
+      if (!quizId) {
+        const { rows: existing } = await db.query<{ id: string }>(
+          'SELECT id::text FROM quizzes WHERE lesson_id = $1',
+          [lesson.id],
+        );
+        quizId = existing[0]?.id;
+      }
+      if (!quizId) throw new Error('Quiz fixture insert failed');
+      await ensureQuizQuestions(db, quizId);
+    }
+    configured += 1;
+  }
+
+  // Repair any earlier fixture quiz that has a row but no questions.
+  const { rows: emptyQuizzes } = await db.query<{ id: string }>(
+    `SELECT q.id::text FROM quizzes q
+      WHERE NOT EXISTS (SELECT 1 FROM quiz_questions qq WHERE qq.quiz_id = q.id)`,
+  );
+  for (const quiz of emptyQuizzes) await ensureQuizQuestions(db, quiz.id);
+
+  return configured;
+}
+
+async function seed(
+  db: DbClient,
+): Promise<{ courses: number; categories: number; learningLessons: number }> {
   // Instructor account (fixture marker in the email domain; not a real person).
   await db.query(
     `INSERT INTO users (email, password_hash, name, bio)
@@ -287,7 +517,11 @@ async function seed(db: DbClient): Promise<{ courses: number; categories: number
     courses += 1;
   }
 
-  if (courses > 0) {
+  // Learning content is seeded for both new and pre-existing courses, so an
+  // upgraded development database gains a working player without data loss.
+  const learningLessons = await seedLearningContent(db);
+
+  if (courses > 0 || learningLessons > 0) {
     await db.query(
       `INSERT INTO audit_events (actor_user_id, action, target_type, target_id, metadata)
        VALUES ($1, 'fixtures.seeded', 'course', NULL, $2::jsonb)`,
@@ -296,6 +530,9 @@ async function seed(db: DbClient): Promise<{ courses: number; categories: number
         JSON.stringify({
           courses,
           categories,
+          learningLessons,
+          lessonKinds: LESSON_KINDS,
+          mediaProvider: 'local_fixture',
           marker: MARKER,
           note: 'Development fixtures only — safe to delete.',
         }),
@@ -303,7 +540,7 @@ async function seed(db: DbClient): Promise<{ courses: number; categories: number
     );
   }
 
-  return { courses, categories };
+  return { courses, categories, learningLessons };
 }
 
 async function main(): Promise<void> {
@@ -316,7 +553,8 @@ async function main(): Promise<void> {
     await runMigrations(db);
     const result = await seed(db);
     process.stdout.write(
-      `Seeded ${result.courses} new course fixture(s), ${result.categories} new categorie(s).\n`,
+      `Seeded ${result.courses} new course fixture(s), ${result.categories} new categorie(s), ` +
+        `${result.learningLessons} learning lesson(s).\n`,
     );
   } finally {
     await db.close();

@@ -3,6 +3,7 @@ import { useAuth } from './auth/AuthProvider.js';
 import { RequireAccess, RequireAuth } from './auth/guards.js';
 import { can } from './auth/permissions.js';
 import { Button, Spinner } from './components/ui.js';
+import { CoursePlayerPage } from './learning/CoursePlayerPage.js';
 import { AccountPage } from './pages/AccountPage.js';
 import { AdminPage } from './pages/AdminPage.js';
 import { CatalogPage } from './pages/CatalogPage.js';
@@ -79,6 +80,22 @@ function AppShell() {
           />
           <Route path="/courses" element={<CatalogPage />} />
           <Route path="/courses/:slug" element={<CourseDetailPage />} />
+          <Route
+            path="/learn/:slug"
+            element={
+              <RequireAuth>
+                <CoursePlayerPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/learn/:slug/:lessonId"
+            element={
+              <RequireAuth>
+                <CoursePlayerPage />
+              </RequireAuth>
+            }
+          />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route
@@ -104,7 +121,7 @@ function AppShell() {
       </main>
 
       <footer className="app-footer">
-        <span className="muted">Premium Academy — catalogue &amp; commerce (Phase 2)</span>
+        <span className="muted">Premium Academy — catalogue, commerce &amp; learning (Phase 3)</span>
       </footer>
     </div>
   );

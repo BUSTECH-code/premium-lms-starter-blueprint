@@ -85,7 +85,7 @@ describe('CourseDetailPage', () => {
     expect(screen.queryByRole('button', { name: 'Purchase access' })).toBeNull();
   });
 
-  it('offers the dashboard instead of buying when the learner already owns the course', async () => {
+  it('offers the course player instead of buying when the learner already owns the course', async () => {
     renderDetail(
       { purchasable: false, access: { entitled: true, entitlementStatus: 'active' } },
       false,
@@ -93,7 +93,8 @@ describe('CourseDetailPage', () => {
 
     expect(await screen.findByRole('heading', { name: 'Node at Scale' })).toBeTruthy();
     expect(await screen.findByText('You have access')).toBeTruthy();
-    expect(await screen.findByRole('link', { name: 'Go to your dashboard' })).toBeTruthy();
+    const playerLink = await screen.findByRole('link', { name: 'Open the course' });
+    expect(playerLink.getAttribute('href')).toBe('/learn/node-at-scale');
     expect(screen.queryByRole('button', { name: 'Purchase access' })).toBeNull();
   });
 

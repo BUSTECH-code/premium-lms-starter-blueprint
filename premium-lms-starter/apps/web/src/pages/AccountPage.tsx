@@ -6,15 +6,43 @@ import { can } from '../auth/permissions.js';
 import { Alert, Badge, Button, Spinner } from '../components/ui.js';
 import { formatDate } from '../lib/format.js';
 
+interface LearningSummary {
+  href: string;
+  progressPercent: number;
+  completedLessons: number;
+  totalLessons: number;
+  completionStatus: string;
+  criteriaVersion: number | null;
+  gradebookAverage: number | null;
+  gradebookAttempts: number;
+}
+
 interface EnrollmentItem {
   enrollmentId: string;
   course: { id: string; slug: string; title: string; status: string; href: string };
   status: string;
   enrolledAt: string;
   completedAt: string | null;
+  /** Present on Phase 3 API responses; tolerated as absent for older caches. */
+  learning?: LearningSummary;
 }
 
-/** Account page: session info plus the learner's enrolled courses library. */
+function learningOf(item: EnrollmentItem): LearningSummary {
+  return (
+    item.learning ?? {
+      href: `/learn/${item.course.slug}`,
+      progressPercent: 0,
+      completedLessons: 0,
+      totalLessons: 0,
+      completionStatus: 'in_progress',
+      criteriaVersion: null,
+      gradebookAverage: null,
+      gradebookAttempts: 0,
+    }
+  );
+}
+
+/** Account page: session info plus the learner's enrolled courses dashboard. */
 export function AccountPage() {
   const { user, logout } = useAuth();
   const [enrollments, setEnrollments] = useState<EnrollmentItem[] | null>(null);
@@ -40,6 +68,29 @@ export function AccountPage() {
 
   if (!user) return null;
 
+  const activeCourses = (enrollments ?? []).filter(
+    (item) => learningOf(item).completionStatus !== 'completed',
+  ).length;
+  const completedLessons = (enrollments ?? []).reduce(
+    (total, item) => total + learningOf(item).completedLessons,
+    0,
+  );
+  const totalLessons = (enrollments ?? []).reduce(
+    (total, item) => total + learningOf(item).totalLessons,
+    0,
+  );
+  const gradebookAverages = (enrollments ?? [])
+    .map((item) => learningOf(item).gradebookAverage)
+    .filter((value): value is number => value !== null);
+  const overallAverage =
+    gradebookAverages.length > 0
+      ? Math.round(
+          (gradebookAverages.reduce((total, value) => total + value, 0) /
+            gradebookAverages.length) *
+            100,
+        ) / 100
+      : null;
+
   return (
     <div className="page">
       <header className="page-header">
@@ -53,7 +104,37 @@ export function AccountPage() {
       </header>
 
       <section className="panel">
-        <h2>Your courses</h2>
+        <div className="section-head">
+          <div>
+            <p className="eyebrow">Continue learning</p>
+            <h2>Your courses</h2>
+          </div>
+          <Link className="button secondary" to="/courses">
+            Browse the catalogue
+          </Link>
+        </div>
+
+        {(enrollments ?? []).length > 0 && !libraryError ? (
+          <div className="dashboard-stats" aria-label="Learning summary">
+            <div>
+              <p className="eyebrow">Active courses</p>
+              <p className="stat-value">{activeCourses}</p>
+            </div>
+            <div>
+              <p className="eyebrow">Lessons completed</p>
+              <p className="stat-value">
+                {completedLessons}/{totalLessons}
+              </p>
+            </div>
+            <div>
+              <p className="eyebrow">Average best score</p>
+              <p className="stat-value">
+                {overallAverage === null ? '—' : `${overallAverage}%`}
+              </p>
+            </div>
+          </div>
+        ) : null}
+
         {enrollments === null ? (
           <Spinner label="Loading your courses…" />
         ) : libraryError ? (
@@ -67,18 +148,45 @@ export function AccountPage() {
           </div>
         ) : (
           <ul className="enrollment-list">
-            {enrollments.map((item) => (
-              <li key={item.enrollmentId} className="enrollment-row">
-                <div>
-                  <Link to={item.course.href}>{item.course.title}</Link>
-                  <p className="muted">
-                    Enrolled {formatDate(item.enrolledAt)}
-                    {item.course.status === 'withdrawn' ? ' · course withdrawn' : ''}
-                  </p>
-                </div>
-                <Badge>{item.status}</Badge>
-              </li>
-            ))}
+            {enrollments.map((item) => {
+              const learning = learningOf(item);
+              return (
+                <li key={item.enrollmentId} className="enrollment-row">
+                  <div className="enrollment-main">
+                    <div className="enrollment-title-row">
+                      <Link to={item.course.href}>{item.course.title}</Link>
+                      <Badge>
+                        {learning.completionStatus === 'completed' ? 'Complete' : item.status}
+                      </Badge>
+                    </div>
+                    <p className="muted">
+                      Enrolled {formatDate(item.enrolledAt)} · {learning.completedLessons} of{' '}
+                      {learning.totalLessons} lessons · Gradebook average{' '}
+                      {learning.gradebookAverage === null
+                        ? '—'
+                        : `${learning.gradebookAverage}%`}
+                      {item.course.status === 'withdrawn' ? ' · course withdrawn' : ''}
+                    </p>
+                    <div
+                      className="progress-track small"
+                      role="progressbar"
+                      aria-label={`${item.course.title} progress`}
+                      aria-valuemin={0}
+                      aria-valuemax={100}
+                      aria-valuenow={learning.progressPercent}
+                    >
+                      <div
+                        className="progress-fill"
+                        style={{ width: `${learning.progressPercent}%` }}
+                      />
+                    </div>
+                  </div>
+                  <Link className="button secondary" to={learning.href}>
+                    {learning.progressPercent > 0 ? 'Continue learning' : 'Open course'}
+                  </Link>
+                </li>
+              );
+            })}
           </ul>
         )}
       </section>
@@ -128,8 +236,9 @@ export function AccountPage() {
       <section className="panel">
         <h2>What's live</h2>
         <p className="muted">
-          Catalogue browsing, purchase with the simulated payment provider, automatic enrolment
-          and this library are live. The learning environment arrives with the next phase.
+          Catalogue browsing, purchase with the simulated payment provider, automatic enrolment,
+          the sequential course player, explicit lesson completion, objective quiz grading and a
+          server-side gradebook are live. Certificates are deliberately not issued in this phase.
         </p>
         <Link className="button secondary" to="/courses">
           Browse the catalogue

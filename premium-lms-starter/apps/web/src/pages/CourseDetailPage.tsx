@@ -40,7 +40,7 @@ interface CourseDetail {
  * Public course landing page: breadcrumb, curriculum outline, instructor
  * bio and a sticky purchase card. Purchase starts an order via the API and
  * hands off to the (simulated) checkout; entitled learners are routed to
- * their dashboard instead. Withdrawn courses never show a buy button.
+ * the course player. Withdrawn courses never show a buy button.
  */
 export function CourseDetailPage() {
   const { slug = '' } = useParams();
@@ -250,8 +250,8 @@ export function CourseDetailPage() {
           {course.access.entitled ? (
             <>
               <Badge>You have access</Badge>
-              <Link className="button primary" to="/">
-                Go to your dashboard
+              <Link className="button primary" to={`/learn/${course.slug}`}>
+                Open the course
               </Link>
             </>
           ) : course.withdrawn || course.status !== 'published' ? (

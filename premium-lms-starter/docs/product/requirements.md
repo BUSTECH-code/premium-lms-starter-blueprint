@@ -34,20 +34,32 @@
 
 ### Course and lesson management
 - **Recommended baseline:** Courses contain ordered modules and lessons.
-- **Open:** Supported lesson types at launch: video, PDF, audio, text, quiz and assignment.
+- **Confirmed (Phase 3 Q1):** Supported lesson types for the implemented learning engine are video,
+  PDF/download, text and quiz. Audio and assignments are not implemented.
 - **Open:** Who may create, review and publish courses.
 - **Confirmed:** Corrections and updates to a purchased course are included.
 - **Open:** Versioning policy for major editions versus minor corrections and supplementary materials.
 
 ### Learning and assessment
 - **Recommended baseline:** Record lesson progress independently from download state.
-- **Recommended baseline:** Course completion criteria are configurable per course, using platform defaults.
-- **Open:** Exact completion rules, quiz attempts, passing scores, assignment approval and retake policy.
-- **Recommended baseline:** Issue certificates only after the system verifies the applicable completion rules.
+- **Confirmed (Phase 3 Q2):** Every lesson is required in module/lesson order; video, text and
+  download lessons complete only by explicit action; quizzes complete only by passing; page visits,
+  100% playback and downloads never complete a lesson.
+- **Confirmed (Phase 3 Q3):** Objective questions are auto-graded; 80% passes; retakes are unlimited;
+  every attempt is recorded; best score per quiz and course average of best scores are retained;
+  answer keys are never sent to the browser. Question randomization is not implemented.
+- **Confirmed (Phase 3 Q4):** The active completion-rule version is frozen on enrolment. Course
+  completion and gradebook are recorded. **No certificate is issued in Phase 3**; certificate
+  design/verification remains open.
+- **Open:** Assignment approval, subjective assessment and future per-course criteria configuration.
 
 ### Content storage and delivery
-- **Confirmed:** Private Google Drive is the initial content repository.
-- **Confirmed:** Backend uses the Drive API; database stores private provider references/file IDs and metadata.
+- **Confirmed:** Private Google Drive is the initial production content repository.
+- **Confirmed (Phase 3 Q1):** Development uses in-repo local video/PDF fixtures served only through
+  backend-authorized short-lived scoped grants that re-check entitlement and lesson unlock. No
+  public links or client-visible credentials/references are exposed. A `MediaProvider` seam is
+  retained for the future Drive adapter; no fake Drive integration is implemented.
+- **Confirmed:** Backend uses the Drive API in production; database stores private provider references/file IDs and metadata.
 - **Confirmed:** Do not expose public Drive links or service credentials to clients.
 - **Recommended baseline:** Use a storage-provider abstraction so the storage provider can change later.
 - **Open:** Video delivery method, transcoding, adaptive streaming, concurrency and bandwidth strategy.

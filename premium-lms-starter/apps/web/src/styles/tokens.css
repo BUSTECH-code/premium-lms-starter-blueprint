@@ -7,8 +7,8 @@
  * foundation follows: restrained colour, strong typography, deliberate
  * whitespace, no decorative gradients or glass effects.
  *
- * Phase 2 replaces these with the approved brand tokens in one place only;
- * components must keep reading from this file.
+ * Exact values remain provisional until brand approval; components must keep
+ * reading from this file so a future token change happens in one place only.
  */
 
 :root {

@@ -234,7 +234,16 @@ describe('progress tracking', () => {
         `INSERT INTO lesson_progress (user_id, lesson_id, status) VALUES ($1, $2, 'completed')`,
         [learner.id, lesson.id],
       ),
-      '23514', // completed requires completed_at
+      '23514', // completed requires timestamp, source and 100% progress
+    );
+    await expectSqlError(
+      db.query(
+        `INSERT INTO lesson_progress
+           (user_id, lesson_id, status, progress_percent, completed_at)
+         VALUES ($1, $2, 'completed', 100, now())`,
+        [learner.id, lesson.id],
+      ),
+      '23514', // completed also requires a completion source
     );
   });
 
@@ -246,8 +255,9 @@ describe('progress tracking', () => {
     const module = await insertModule(db, course.id);
     const lesson = await insertLesson(db, module.id);
     await db.query(
-      `INSERT INTO lesson_progress (user_id, lesson_id, status, completed_at)
-       VALUES ($1, $2, 'completed', now())`,
+      `INSERT INTO lesson_progress
+         (user_id, lesson_id, status, progress_percent, completed_at, completion_source)
+       VALUES ($1, $2, 'completed', 100, now(), 'explicit')`,
       [learner.id, lesson.id],
     );
 

@@ -51,3 +51,22 @@ A check is only reported as passed if it was run and its result observed. Distin
 - Passed.
 
 Do not substitute a successful build for functional verification. Do not substitute functional tests for visual inspection.
+
+## Phase 3 evidence status (2026-11-05)
+
+- Unit, integration and DOM/component tests for lesson state transitions, sequential unlock,
+  explicit completion, quiz grading/gradebook, offline event replay, media authorization and
+  dashboard progress views: **Passed** (`npm test`: 26 files / 242 tests).
+- Migration apply, checksum recording and tamper detection: **Passed** (including
+  `0004_learning_engine`).
+- `npm run typecheck`, `npm run build`, `npm run migrate` and idempotent `npm run seed:fixtures`:
+  **Passed**.
+- Browser screenshots at agreed viewports, keyboard/focus inspection and reference-image
+  comparison: **Not run** in this environment. DOM component tests cover loading, error, locked,
+  progress and completion states, but visual acceptance remains a follow-up.
+- Real-device offline playback/licence renewal and certificate issuance: **Not run / out of scope**.
+  Offline reconnection behaviour is verified through client queue and API integration tests;
+  certificates are excluded by approved Q4.
+
+See `docs/implementation/phase-3-learning-and-progress.md` for the full completion report and
+still-open decisions.

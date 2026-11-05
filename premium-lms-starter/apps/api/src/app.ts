@@ -7,7 +7,10 @@ import { SlidingWindowRateLimiter } from './auth/rate-limit.js';
 import { createCatalogRouter } from './catalog/routes.js';
 import { createCommerceRouter } from './commerce/routes.js';
 import type { Env } from './config/env.js';
+import { createLearningRouter } from './learning/routes.js';
 import type { Logger } from './lib/logger.js';
+import { createMediaRouter } from './media/routes.js';
+import { createMediaProvider } from './media/provider.js';
 import { errorHandler, notFoundHandler } from './middleware/error-handler.js';
 import { requestLogger } from './middleware/request-logger.js';
 import { cors, originCheck, securityHeaders } from './middleware/security.js';
@@ -74,6 +77,8 @@ export function createApp({ env, db, logger }: AppDependencies): Express {
     '/api',
     createCommerceRouter({ env, db, logger, checkoutLimiter: limiters.checkout }),
   );
+  app.use('/api', createLearningRouter({ env, db }));
+  app.use('/api', createMediaRouter({ env, db, provider: createMediaProvider() }));
 
   app.use(notFoundHandler);
   app.use(errorHandler(logger));

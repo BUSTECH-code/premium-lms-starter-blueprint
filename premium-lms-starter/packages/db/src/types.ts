@@ -72,6 +72,7 @@ export interface LessonRow {
   module_id: string;
   title: string;
   position: number;
+  kind: 'video' | 'text' | 'quiz' | 'download';
   duration_seconds: string | null;
   created_at: Date;
   updated_at: Date;
@@ -82,6 +83,8 @@ export interface EnrollmentRow {
   user_id: string;
   course_id: string;
   status: 'active' | 'completed';
+  /** Completion-rule version frozen at enrolment (approved Q4). */
+  criteria_version: number;
   enrolled_at: Date;
   completed_at: Date | null;
   created_at: Date;
@@ -176,6 +179,34 @@ export interface LessonProgressRow {
   status: 'not_started' | 'in_progress' | 'completed';
   progress_percent: string;
   playback_position_seconds: string | null;
+  completed_at: Date | null;
+  completion_source: 'explicit' | 'quiz_pass' | null;
+  revision: number;
+  last_event_at: Date | null;
+  created_at: Date;
+  updated_at: Date;
+}
+
+export interface MediaAssetRow {
+  id: string;
+  provider: 'local_fixture' | 'google_drive';
+  provider_reference: string;
+  mime_type: string;
+  file_name: string;
+  file_size_bytes: string;
+  checksum_sha256: string;
+  duration_seconds: string | null;
+  version: number;
+  created_at: Date;
+  updated_at: Date;
+}
+
+export interface CourseCompletionRow {
+  id: string;
+  user_id: string;
+  course_id: string;
+  criteria_version: number;
+  status: 'not_eligible' | 'in_progress' | 'completed' | 'certificate_issued';
   completed_at: Date | null;
   created_at: Date;
   updated_at: Date;
