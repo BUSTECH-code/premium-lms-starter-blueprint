@@ -10,7 +10,7 @@ The initial product is centred on recorded video courses and course materials. T
 
 The product owner previously reviewed the Luxbridge Academy website and wanted to retain selected strengths of its presentation while adapting them to a video-first learning platform. The intended lesson is polished educational presentation and clear content hierarchy—not copying tutor-focused functionality.
 
-Use reference images in `references/` as visual evidence. They are not a substitute for this written direction.
+The six local reference images in `docs/design/references/images/` were inspected as visual evidence during Phase 4. External source pages were not fetched in this environment. The references are design inputs, not production assets, and they are not a substitute for this written direction.
 
 ## Desired qualities
 
@@ -84,12 +84,18 @@ Use reference images in `references/` as visual evidence. They are not a substit
 - Decorative controls that do nothing.
 - Visual effects that impair performance or accessibility.
 
+## Confirmed Phase 4 baseline
+
+The product owner approved the provisional editorial tokens as the **official Phase 4 visual baseline** on 2026-11-05. Exact values are now **Confirmed** in `design-system.md` and `apps/web/src/styles/tokens.css`: neutral paper/ink palette, deep navy accent, Georgia serif display with a system sans body, 4px spacing scale, restrained borders/shadows and no gradients or glass effects.
+
+Phase 4 implements shared editorial primitives and confirmed responsive CSS bands across Catalogue, Course Detail, Checkout, Account/Dashboard and Course Player. Local references informed hierarchy and restraint only; no reference brand, exact composition or third-party image was copied.
+
 ## Brand decisions still open
 
-Do not invent final brand identity values. Product owner must approve:
+Do not invent final brand identity values. Product owner must still approve:
 - Brand name and logo.
-- Primary and secondary colours.
-- Typography/font choices.
 - Image art direction.
 - Light/dark theme policy.
 - Icon style.
+
+The confirmed tokens are an implementation baseline, not a claim that these broader identity decisions are resolved.

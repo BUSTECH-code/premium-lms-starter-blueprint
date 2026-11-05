@@ -6,6 +6,7 @@ import { parseEnv, type Env } from '../src/config/env.js';
 import { createLogger } from '../src/lib/logger.js';
 
 export const TEST_JWT_SECRET = 'unit-test-secret-at-least-32-characters-long!!';
+export const TEST_MEDIA_SIGNING_SECRET = 'unit-test-media-signing-secret-at-least-32-chars!!';
 
 export interface TestApp {
   app: Express;
@@ -16,6 +17,7 @@ export interface TestApp {
 
 /** Build the full application against a fresh in-memory database. */
 export async function createTestApp(overrides: Record<string, string> = {}): Promise<TestApp> {
+  const productionLike = overrides.NODE_ENV === 'production' || overrides.NODE_ENV === 'staging';
   const env = parseEnv({
     NODE_ENV: 'test',
     JWT_SECRET: TEST_JWT_SECRET,
@@ -24,6 +26,9 @@ export async function createTestApp(overrides: Record<string, string> = {}): Pro
     WEB_ORIGIN: 'http://localhost:5173,http://127.0.0.1:5173',
     RATE_LIMIT_LOGIN_MAX_ATTEMPTS: '1000',
     RATE_LIMIT_REGISTER_MAX_ATTEMPTS: '1000',
+    RATE_LIMIT_MEDIA_GRANT_MAX_ATTEMPTS: '1000',
+    RATE_LIMIT_MEDIA_CONTENT_MAX_ATTEMPTS: '1000',
+    ...(productionLike ? { MEDIA_SIGNING_SECRET: TEST_MEDIA_SIGNING_SECRET } : {}),
     ...overrides,
   });
   const db = await createDatabase({ driver: 'pglite', path: 'memory:' });

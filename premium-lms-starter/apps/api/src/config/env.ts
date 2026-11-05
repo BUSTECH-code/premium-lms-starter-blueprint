@@ -1,4 +1,4 @@
-import { randomBytes } from 'node:crypto';
+import { createHmac, randomBytes } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -46,6 +46,15 @@ const rawSchema = z.object({
   CHECKOUT_TTL_MINUTES: z.coerce.number().int().min(1).max(1440).default(30),
   RATE_LIMIT_CHECKOUT_MAX_ATTEMPTS: z.coerce.number().int().min(1).max(100_000).default(30),
   RATE_LIMIT_CHECKOUT_WINDOW_SECONDS: z.coerce.number().int().min(1).max(86_400).default(300),
+  // --- Phase 4: signed media delivery --------------------------------------
+  // Dedicated HMAC secret for signed URLs and opaque session references.
+  // Required in staging/production; derived from JWT_SECRET only in local
+  // development/test so no extra secret file is needed there.
+  MEDIA_SIGNING_SECRET: z.string().optional(),
+  RATE_LIMIT_MEDIA_GRANT_MAX_ATTEMPTS: z.coerce.number().int().min(1).max(100_000).default(30),
+  RATE_LIMIT_MEDIA_GRANT_WINDOW_SECONDS: z.coerce.number().int().min(1).max(86_400).default(300),
+  RATE_LIMIT_MEDIA_CONTENT_MAX_ATTEMPTS: z.coerce.number().int().min(1).max(100_000).default(240),
+  RATE_LIMIT_MEDIA_CONTENT_WINDOW_SECONDS: z.coerce.number().int().min(1).max(86_400).default(300),
 });
 
 export interface RateLimitRule {
@@ -74,6 +83,14 @@ export interface Env {
     register: RateLimitRule;
     /** Order creation / simulated checkout attempts per user. */
     checkout: RateLimitRule;
+    /** Scoped media grant issuance per user and lesson. */
+    mediaGrant: RateLimitRule;
+    /** Authenticated media-content/range requests per user and session. */
+    mediaContent: RateLimitRule;
+  };
+  media: {
+    /** HMAC key for signed delivery URLs and opaque session references. */
+    signingSecret: string;
   };
   commerce: {
     /** Store currency (placeholder pending O-05/O-21). */
@@ -97,6 +114,17 @@ const WEAK_SECRET_EXACT = new Set([
   'dev-secret',
   'example-secret',
 ]);
+
+/**
+ * Local-development fallback only. Production-like environments must supply a
+ * dedicated MEDIA_SIGNING_SECRET so rotating JWT keys cannot affect delivery
+ * signatures and one secret is never reused across cryptographic purposes.
+ */
+export function deriveMediaSigningSecret(jwtSecret: string): string {
+  return createHmac('sha256', jwtSecret)
+    .update('lms.media.delivery.v1')
+    .digest('base64url');
+}
 
 /**
  * Pure environment validation. `input` is a plain key/value map (typically
@@ -227,6 +255,27 @@ export function parseEnv(input: Record<string, string | undefined>): Env {
     webhookSecret = randomBytes(48).toString('base64url');
   }
 
+  // --- Signed media delivery (Phase 4) -------------------------------------
+  let mediaSigningSecret = raw.MEDIA_SIGNING_SECRET?.trim() || undefined;
+  if (isProductionLike) {
+    if (!mediaSigningSecret) {
+      throw new EnvironmentError(
+        'MEDIA_SIGNING_SECRET is required in staging/production. Provide it through the deployment secret store — never commit it.',
+      );
+    }
+    if (mediaSigningSecret.length < 32) {
+      throw new EnvironmentError(
+        'MEDIA_SIGNING_SECRET must be at least 32 characters in staging/production.',
+      );
+    }
+    const lower = mediaSigningSecret.toLowerCase();
+    if (WEAK_SECRET_MARKERS.some((marker) => lower.includes(marker)) || WEAK_SECRET_EXACT.has(lower)) {
+      throw new EnvironmentError('MEDIA_SIGNING_SECRET appears to be a placeholder value.');
+    }
+  } else if (!mediaSigningSecret) {
+    mediaSigningSecret = deriveMediaSigningSecret(jwtSecret);
+  }
+
   return Object.freeze({
     nodeEnv,
     isProductionLike,
@@ -254,6 +303,17 @@ export function parseEnv(input: Record<string, string | undefined>): Env {
         maxAttempts: raw.RATE_LIMIT_CHECKOUT_MAX_ATTEMPTS,
         windowSeconds: raw.RATE_LIMIT_CHECKOUT_WINDOW_SECONDS,
       }),
+      mediaGrant: Object.freeze({
+        maxAttempts: raw.RATE_LIMIT_MEDIA_GRANT_MAX_ATTEMPTS,
+        windowSeconds: raw.RATE_LIMIT_MEDIA_GRANT_WINDOW_SECONDS,
+      }),
+      mediaContent: Object.freeze({
+        maxAttempts: raw.RATE_LIMIT_MEDIA_CONTENT_MAX_ATTEMPTS,
+        windowSeconds: raw.RATE_LIMIT_MEDIA_CONTENT_WINDOW_SECONDS,
+      }),
+    }),
+    media: Object.freeze({
+      signingSecret: mediaSigningSecret,
     }),
     commerce: Object.freeze({
       currency,

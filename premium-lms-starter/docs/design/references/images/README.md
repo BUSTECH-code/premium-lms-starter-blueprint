@@ -21,3 +21,7 @@ Place approved visual-reference screenshots in this folder so coding agents can 
 6. If a reference is unavailable, tell the user. Do not silently substitute a generic design.
 
 When a local image is added, update `../REFERENCE-SOURCES.md` with its filename so the agent can map the image to its design purpose.
+
+## Phase 4 evidence note (2026-11-05)
+
+The six local reference images in `images/` were inspected as design inputs. External source pages were not fetched in this environment. No third-party image was copied into the LMS interface. Automated browser screenshots, rendered viewport captures and side-by-side visual comparison were **Not run**; Phase 4 sign-off uses DOM component tests, typechecking and build verification instead.

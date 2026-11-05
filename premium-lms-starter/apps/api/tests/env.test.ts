@@ -2,7 +2,14 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { EnvironmentError, findWorkspaceRoot, loadEnv, parseEnv, readEnvFile } from '../src/config/env.js';
+import {
+  EnvironmentError,
+  deriveMediaSigningSecret,
+  findWorkspaceRoot,
+  loadEnv,
+  parseEnv,
+  readEnvFile,
+} from '../src/config/env.js';
 
 describe('parseEnv — development/test defaults', () => {
   it('generates a strong ephemeral secret when none is provided', () => {
@@ -43,6 +50,7 @@ describe('parseEnv — commerce (Phase 2)', () => {
     NODE_ENV: 'staging',
     DB_PATH: 'memory:',
     JWT_SECRET: 'x'.repeat(40),
+    MEDIA_SIGNING_SECRET: 'stage-media-signing-key-9f3a7c1e5b2d8a4f',
     WEB_ORIGIN: 'https://staging.academy.example.com',
   };
   const testBase = { NODE_ENV: 'test', DB_PATH: 'memory:' };
@@ -105,6 +113,7 @@ describe('parseEnv — staging/production hardening', () => {
   const prodBase = {
     NODE_ENV: 'production',
     DB_PATH: '/var/lib/lms/data',
+    MEDIA_SIGNING_SECRET: 'production-media-signing-key-9f3a7c1e5b2d8a4f',
     WEB_ORIGIN: 'https://academy.example.com',
   };
 
@@ -144,6 +153,7 @@ describe('parseEnv — staging/production hardening', () => {
       NODE_ENV: 'staging',
       DB_PATH: 'memory:',
       JWT_SECRET: 'x'.repeat(40),
+      MEDIA_SIGNING_SECRET: 'stage-media-signing-key-9f3a7c1e5b2d8a4f',
       WEB_ORIGIN: 'https://staging.academy.example.com',
     };
     expect(parseEnv(base).auth.cookieSecure).toBe(true);
@@ -151,6 +161,50 @@ describe('parseEnv — staging/production hardening', () => {
     expect(
       parseEnv({ ...base, COOKIE_SECURE: 'false', ALLOW_INSECURE_COOKIES: 'true' }).auth.cookieSecure,
     ).toBe(false);
+  });
+});
+
+describe('parseEnv — Phase 4 signed media delivery', () => {
+  const testBase = {
+    NODE_ENV: 'test',
+    DB_PATH: 'memory:',
+    JWT_SECRET: 'x'.repeat(40),
+  };
+  const prodBase = {
+    NODE_ENV: 'production',
+    DB_PATH: '/var/lib/lms/data',
+    JWT_SECRET: 'x'.repeat(40),
+    WEB_ORIGIN: 'https://academy.example.com',
+  };
+
+  it('derives a deterministic, purpose-separated local media key', () => {
+    const env = parseEnv(testBase);
+    expect(env.media.signingSecret).toBe(deriveMediaSigningSecret(env.auth.jwtSecret));
+    expect(env.media.signingSecret).not.toBe(env.auth.jwtSecret);
+    expect(parseEnv(testBase).media.signingSecret).toBe(env.media.signingSecret);
+  });
+
+  it('requires a dedicated strong media secret in production-like environments', () => {
+    expect(() => parseEnv(prodBase)).toThrow(/MEDIA_SIGNING_SECRET is required/);
+    expect(() => parseEnv({ ...prodBase, MEDIA_SIGNING_SECRET: 'short' })).toThrow(/at least 32/);
+    expect(() => parseEnv({ ...prodBase, MEDIA_SIGNING_SECRET: 'changeme-'.repeat(6) })).toThrow(
+      /placeholder/,
+    );
+    const secret = 'production-media-signing-key-9f3a7c1e5b2d8a4f';
+    expect(parseEnv({ ...prodBase, MEDIA_SIGNING_SECRET: secret }).media.signingSecret).toBe(secret);
+  });
+
+  it('applies media grant and delivery rate-limit defaults and overrides', () => {
+    const env = parseEnv(testBase);
+    expect(env.rateLimit.mediaGrant).toEqual({ maxAttempts: 30, windowSeconds: 300 });
+    expect(env.rateLimit.mediaContent).toEqual({ maxAttempts: 240, windowSeconds: 300 });
+    const overridden = parseEnv({
+      ...testBase,
+      RATE_LIMIT_MEDIA_GRANT_MAX_ATTEMPTS: '5',
+      RATE_LIMIT_MEDIA_CONTENT_MAX_ATTEMPTS: '12',
+    });
+    expect(overridden.rateLimit.mediaGrant.maxAttempts).toBe(5);
+    expect(overridden.rateLimit.mediaContent.maxAttempts).toBe(12);
   });
 });
 
@@ -221,6 +275,7 @@ describe('loadEnv', () => {
         NODE_ENV: 'production',
         WEB_ORIGIN: 'https://academy.example.com',
         JWT_SECRET: 'a-sufficiently-long-deployment-secret-value!!',
+        MEDIA_SIGNING_SECRET: 'production-media-signing-key-9f3a7c1e5b2d8a4f',
       }),
     ).toThrow(/DB_PATH must be set explicitly/);
   });

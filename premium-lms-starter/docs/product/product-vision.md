@@ -19,6 +19,12 @@ Core learner experience:
 8. Receive a certificate when the course's completion rules are satisfied.
 9. Download supported content for protected in-app offline learning.
 
+> **Phase 3 implementation note:** discovery through required assessments and server-side progress
+> are implemented in the learning engine. Certificate issuance (step 8) is deliberately **not**
+> implemented in Phase 3 by approved decision `frozen_no_certificate`; real-device protected offline
+> learning (step 9) remains future work. See
+> `docs/implementation/phase-3-learning-and-progress.md`.
+
 Live tutoring, live classes, mentorship and instructor-led scheduling are future possibilities, not launch commitments.
 
 ## Product experience goals

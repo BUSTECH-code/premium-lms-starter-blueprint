@@ -2,7 +2,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ApiError, apiFetch } from '../auth/api.js';
 import { useAuth } from '../auth/AuthProvider.js';
-import { Alert, Badge, Button, Spinner } from '../components/ui.js';
+import { CourseCover, PageIntro, StatePanel } from '../components/editorial.js';
+import { Badge, Button, Spinner } from '../components/ui.js';
 import { formatDuration, formatPrice } from '../lib/format.js';
 
 interface CurriculumModule {
@@ -37,10 +38,9 @@ interface CourseDetail {
 }
 
 /**
- * Public course landing page: breadcrumb, curriculum outline, instructor
- * bio and a sticky purchase card. Purchase starts an order via the API and
- * hands off to the (simulated) checkout; entitled learners are routed to
- * their dashboard instead. Withdrawn courses never show a buy button.
+ * Public course landing page. Purchase starts an order via the API and hands
+ * off to simulated checkout; entitled learners are routed to the player.
+ * Withdrawn courses never show a buy button.
  */
 export function CourseDetailPage() {
   const { slug = '' } = useParams();
@@ -107,25 +107,32 @@ export function CourseDetailPage() {
 
   if (loading) {
     return (
-      <div className="page">
-        <div className="spinner-row" aria-live="polite">
+      <div className="page" data-testid="course-detail-loading">
+        <StatePanel
+          kind="loading"
+          title="Loading course"
+          description="Fetching the published course, curriculum and purchase state."
+          testId="course-detail-loading-state"
+        >
           <Spinner label="Loading course…" />
-        </div>
+        </StatePanel>
       </div>
     );
   }
 
   if (notFound || !course) {
     return (
-      <div className="full-page-state">
-        <div className="panel narrow">
-          <p className="eyebrow">404</p>
-          <h1>Course not found</h1>
-          <p className="muted">This course does not exist or is not available.</p>
+      <div className="full-page-state" data-testid="course-not-found-page">
+        <StatePanel
+          kind="error"
+          title="Course not found"
+          description="This course does not exist or is not available."
+          testId="course-not-found-state"
+        >
           <Link className="button secondary" to="/courses">
             Back to catalogue
           </Link>
-        </div>
+        </StatePanel>
       </div>
     );
   }
@@ -134,53 +141,108 @@ export function CourseDetailPage() {
     .split(/\n{2,}/)
     .map((text) => text.trim())
     .filter(Boolean);
+  const categoryLabel =
+    course.categories.length > 0
+      ? course.categories.map((category) => category.name).join(' · ')
+      : 'Course';
 
   return (
-    <div className="page">
-      <nav className="breadcrumb" aria-label="Breadcrumb">
+    <div
+      className="page course-detail-page"
+      data-testid="course-detail-page"
+      data-responsive-layout="stacked-mobile split-tablet grid-desktop"
+    >
+      <nav className="breadcrumbs" aria-label="Breadcrumb" data-testid="course-breadcrumbs">
         <Link to="/courses">Catalogue</Link>
         <span aria-hidden="true"> / </span>
         <span>{course.title}</span>
       </nav>
 
-      {error ? <Alert>{error}</Alert> : null}
+      <PageIntro
+        eyebrow={categoryLabel}
+        title={course.title}
+        lede={course.summary ?? 'A structured course with a published curriculum and instructor.'}
+        className="course-detail-hero"
+        testId="course-detail-hero"
+        titleId="course-detail-title"
+        aside={
+          <CourseCover
+            title={course.title}
+            category={categoryLabel}
+            index={1}
+            testId="course-detail-cover"
+          />
+        }
+      />
 
-      <div className="detail-layout">
-        <div className="detail-main">
-          <p className="eyebrow">
-            {course.categories.length > 0
-              ? course.categories.map((c) => c.name).join(' · ')
-              : 'Course'}
-          </p>
-          <h1>{course.title}</h1>
+      {error ? (
+        <StatePanel
+          kind="error"
+          title="Checkout could not start"
+          description={error}
+          testId="course-detail-error-state"
+        />
+      ) : null}
+
+      {course.withdrawn ? (
+        <StatePanel
+          kind="warning"
+          title="Withdrawn course"
+          description="This course is no longer for sale. Your access and purchase history are preserved."
+          testId="course-withdrawn-state"
+        />
+      ) : null}
+      {course.status !== 'published' && !course.withdrawn ? (
+        <StatePanel
+          kind="warning"
+          title="Not currently on sale"
+          description="This course is not currently on sale."
+          testId="course-unpublished-state"
+        />
+      ) : null}
+
+      <div
+        className="detail-layout course-detail-layout"
+        data-testid="course-detail-layout"
+      >
+        <main className="panel detail-main" data-testid="course-detail-main">
           <p className="course-meta muted">
             Taught by {course.instructor.name} · {course.stats.moduleCount} module
             {course.stats.moduleCount === 1 ? '' : 's'} · {course.stats.lessonCount} lesson
             {course.stats.lessonCount === 1 ? '' : 's'} ·{' '}
             {formatDuration(course.stats.totalDurationSeconds)}
           </p>
-          {course.summary ? <p className="lede">{course.summary}</p> : null}
 
-          {course.withdrawn ? (
-            <Alert kind="success">
-              This course is no longer for sale. Your access and purchase history are preserved.
-            </Alert>
-          ) : null}
-          {course.status !== 'published' && !course.withdrawn ? (
-            <Alert kind="success">This course is not currently on sale.</Alert>
-          ) : null}
+          <dl className="course-format-grid" data-testid="course-format-grid">
+            <div className="format-stat">
+              <dt>Modules</dt>
+              <dd>{course.stats.moduleCount}</dd>
+            </div>
+            <div className="format-stat">
+              <dt>Lessons</dt>
+              <dd>{course.stats.lessonCount}</dd>
+            </div>
+            <div className="format-stat">
+              <dt>Total length</dt>
+              <dd>{formatDuration(course.stats.totalDurationSeconds)}</dd>
+            </div>
+            <div className="format-stat">
+              <dt>Instructor</dt>
+              <dd>{course.instructor.name}</dd>
+            </div>
+          </dl>
 
           {paragraphs.length > 0 ? (
-            <section className="panel">
-              <h2>About this course</h2>
+            <section className="prose" aria-labelledby="about-course-title">
+              <h2 id="about-course-title">About this course</h2>
               {paragraphs.map((text) => (
                 <p key={text.slice(0, 40)}>{text}</p>
               ))}
             </section>
           ) : null}
 
-          <section className="panel">
-            <h2>Curriculum</h2>
+          <section className="curriculum-card" aria-labelledby="curriculum-title">
+            <h2 id="curriculum-title">Curriculum</h2>
             {course.curriculum.length === 0 ? (
               <p className="muted">The curriculum is being finalised.</p>
             ) : (
@@ -197,9 +259,7 @@ export function CourseDetailPage() {
                       {module.lessons.map((lesson) => (
                         <li key={lesson.id}>
                           <span>{lesson.title}</span>
-                          <span className="muted">
-                            {formatDuration(lesson.duration_seconds)}
-                          </span>
+                          <span className="muted">{formatDuration(lesson.duration_seconds)}</span>
                         </li>
                       ))}
                     </ol>
@@ -209,8 +269,8 @@ export function CourseDetailPage() {
             )}
           </section>
 
-          <section className="panel">
-            <h2>Your instructor</h2>
+          <section className="instructor-card" aria-labelledby="instructor-title">
+            <h2 id="instructor-title">Your instructor</h2>
             <p className="course-meta muted">{course.instructor.name}</p>
             {course.instructor.bio ? (
               <p>{course.instructor.bio}</p>
@@ -228,9 +288,14 @@ export function CourseDetailPage() {
               ))}
             </div>
           ) : null}
-        </div>
+        </main>
 
-        <aside className="purchase-card" aria-label="Purchase">
+        <aside
+          className="panel purchase-card"
+          aria-label="Purchase"
+          data-testid="purchase-card"
+        >
+          <p className="section-label">One-time enrolment</p>
           <p className="price">{formatPrice(course.price.amount, course.price.currency)}</p>
           <dl className="detail-grid">
             <div>
@@ -247,26 +312,28 @@ export function CourseDetailPage() {
             </div>
           </dl>
 
-          {course.access.entitled ? (
-            <>
-              <Badge>You have access</Badge>
-              <Link className="button primary" to="/">
-                Go to your dashboard
+          <div className="purchase-actions">
+            {course.access.entitled ? (
+              <>
+                <Badge>You have access</Badge>
+                <Link className="button primary" to={`/learn/${course.slug}`}>
+                  Open the course
+                </Link>
+              </>
+            ) : course.withdrawn || course.status !== 'published' ? (
+              <p className="muted">Not currently available for purchase.</p>
+            ) : status === 'anonymous' ? (
+              <Link className="button primary" to="/login">
+                Sign in to purchase
               </Link>
-            </>
-          ) : course.withdrawn || course.status !== 'published' ? (
-            <p className="muted">Not currently available for purchase.</p>
-          ) : status === 'anonymous' ? (
-            <Link className="button primary" to="/login">
-              Sign in to purchase
-            </Link>
-          ) : status === 'loading' ? (
-            <Spinner label="Checking your session…" />
-          ) : (
-            <Button loading={purchasing} onClick={() => void startPurchase()}>
-              Purchase access
-            </Button>
-          )}
+            ) : status === 'loading' ? (
+              <Spinner label="Checking your session…" />
+            ) : (
+              <Button loading={purchasing} onClick={() => void startPurchase()}>
+                Purchase access
+              </Button>
+            )}
+          </div>
 
           <p className="muted small-print">
             One-time payment. Access is added to your account as soon as payment is confirmed.

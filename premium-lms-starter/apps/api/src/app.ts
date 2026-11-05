@@ -7,7 +7,10 @@ import { SlidingWindowRateLimiter } from './auth/rate-limit.js';
 import { createCatalogRouter } from './catalog/routes.js';
 import { createCommerceRouter } from './commerce/routes.js';
 import type { Env } from './config/env.js';
+import { createLearningRouter } from './learning/routes.js';
 import type { Logger } from './lib/logger.js';
+import { createMediaRouter } from './media/routes.js';
+import { createMediaProvider } from './media/provider.js';
 import { errorHandler, notFoundHandler } from './middleware/error-handler.js';
 import { requestLogger } from './middleware/request-logger.js';
 import { cors, originCheck, securityHeaders } from './middleware/security.js';
@@ -65,6 +68,14 @@ export function createApp({ env, db, logger }: AppDependencies): Express {
       env.rateLimit.checkout.maxAttempts,
       env.rateLimit.checkout.windowSeconds,
     ),
+    mediaGrant: new SlidingWindowRateLimiter(
+      env.rateLimit.mediaGrant.maxAttempts,
+      env.rateLimit.mediaGrant.windowSeconds,
+    ),
+    mediaContent: new SlidingWindowRateLimiter(
+      env.rateLimit.mediaContent.maxAttempts,
+      env.rateLimit.mediaContent.windowSeconds,
+    ),
   };
 
   app.use('/api/auth', createAuthRouter({ env, db, logger, limiters }));
@@ -73,6 +84,16 @@ export function createApp({ env, db, logger }: AppDependencies): Express {
   app.use(
     '/api',
     createCommerceRouter({ env, db, logger, checkoutLimiter: limiters.checkout }),
+  );
+  app.use('/api', createLearningRouter({ env, db, mediaGrantLimiter: limiters.mediaGrant }));
+  app.use(
+    '/api',
+    createMediaRouter({
+      env,
+      db,
+      provider: createMediaProvider(),
+      contentLimiter: limiters.mediaContent,
+    }),
   );
 
   app.use(notFoundHandler);

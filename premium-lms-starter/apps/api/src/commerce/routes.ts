@@ -346,6 +346,20 @@ export function createCommerceRouter(deps: CommerceRouterDeps): Router {
             enrolledAt: item.enrolled_at,
             completedAt: item.completed_at,
             price: { amount: item.price_amount, currency: item.price_currency },
+            learning: {
+              href: `/learn/${item.course_slug}`,
+              progressPercent:
+                item.total_lessons > 0
+                  ? Math.round((item.completed_lessons / item.total_lessons) * 100)
+                  : 0,
+              completedLessons: item.completed_lessons,
+              totalLessons: item.total_lessons,
+              completionStatus: item.completion_status ?? 'in_progress',
+              criteriaVersion: item.criteria_version,
+              gradebookAverage:
+                item.gradebook_average === null ? null : Number(item.gradebook_average),
+              gradebookAttempts: item.gradebook_attempts,
+            },
           })),
         });
       } catch (error) {

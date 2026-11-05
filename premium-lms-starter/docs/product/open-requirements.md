@@ -9,16 +9,34 @@ Implementation agents must not invent answers to these questions.
 | O-01 | After a course is withdrawn, do existing purchasers retain access? | Conflicts must be resolved against ongoing access and content rights. |
 | O-02 | Who owns course content and what happens when a creator/instructor leaves? | Affects content rights, continuity and withdrawal. |
 | O-03 | Who can create, review and publish courses? Is approval required? | Defines workflow and permissions. |
-| O-04 | Which lesson types launch: video, PDF, audio, text, quiz, assignment? | Defines content model and player. |
+| O-04 | **Resolved (Phase 3):** video, PDF/download, text and quiz launch; audio and assignments do not. | Defines content model and player. See `docs/implementation/phase-3-learning-and-progress.md`. |
 | O-05 | Which payment provider, currencies and payment methods? | Required for order and payment implementation. Paystack is not confirmed. |
 | O-06 | Android only or Android and iOS? | Changes mobile delivery and offline implementation. |
 | O-07 | What are expected student counts and peak concurrent viewers? | Needed to choose and validate video delivery. |
 | O-08 | What video sizes, resolutions and download limits are expected? | Affects storage, bandwidth and UX. |
 
+## Resolved in Phase 3 (confirmed product decisions)
+
+- **Q1 `local_authorized_fixtures`** resolves the Phase 3 media portion of O-04/O-22: local
+  development video/PDF fixtures are delivered only through backend-authorized scoped grants;
+  private Google Drive remains the production provider seam.
+- **Q2 `sequential_explicit`** resolves O-09 for Phase 3: every lesson is required in module/lesson
+  order; explicit completion for video/text/download, passing for quizzes, no completion from page
+  visits or downloads; course completion requires all required lessons.
+- **Q3 `pass80_unlimited_best`** resolves the Phase 3 portion of O-10: objective auto-grading,
+  80% pass, unlimited retakes, every attempt recorded, best score per quiz, course average of best
+  scores, answer keys never sent to the browser. Question randomization is not implemented.
+- **Q4 `frozen_no_certificate`**: freeze the active completion-rule version on enrolment; record
+  course completion and gradebook; no certificate issuance in Phase 3. Certificate
+  design/verification remains open.
+
+See `docs/implementation/phase-3-learning-and-progress.md` for the authoritative implementation
+notes and verification evidence.
+
 ## Learning and content
 
-- O-09: Exact course completion criteria and per-course configuration options.
-- O-10: Quiz passing score, retake limits, question randomization and attempt review.
+- O-09: **Resolved for Phase 3** by Q2; future per-course configuration options remain open.
+- O-10: **Resolved for Phase 3** by Q3; question randomization and subjective assessment remain open.
 - O-11: Assignment submission and instructor review requirements.
 - O-12: How major course editions differ from included corrections.
 - O-13: Whether course previews are offered.
@@ -57,4 +75,13 @@ Implementation agents must not invent answers to these questions.
 
 ## Recommended order
 
-Resolve O-01, O-03 through O-08 before committing to detailed implementation architecture. Resolve each remaining decision before the affected feature is implemented.
+Resolve O-01, O-03 through O-08 before committing to detailed implementation architecture. O-04, O-09 and O-10 are resolved for the implemented Phase 3 scope by Q1–Q3 above; resolve each remaining decision before the affected future feature is implemented.
+
+## Resolved in Phase 4 (confirmed product decisions)
+
+- Provisional editorial tokens are **confirmed** as the official Phase 4 visual baseline. Brand name/logo, image art direction, icon style and light/dark theme remain Open.
+- Phase 4 security hardening is **web-only**. Native mobile device registration and native offline licensing are explicitly deferred; no concurrent-session cap or 2-session limit was invented.
+- The web player watermark displays signed-in email, short session ID and timestamp. PDF downloads remain checksum-exact; the overlay is a deterrent, not DRM.
+- Phase 4 visual sign-off uses DOM component tests, full typechecking and production build verification. Automated browser screenshots and rendered viewport comparison were **Not run** and must not be claimed.
+
+O-01, O-03, O-05/O-21, O-06/O-07/O-08, O-11, O-15, certificate design/verification, O-22–O-28, session duration/concurrent policy, device identity/reset/reinstall, replacement cooldown, old offline content after replacement, offline expiry, rooted-device policy, download quality/storage/resumability, offline quizzes and delivery-provider/CDN choice remain Open.

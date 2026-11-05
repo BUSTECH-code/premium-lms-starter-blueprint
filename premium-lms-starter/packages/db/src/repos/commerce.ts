@@ -623,6 +623,13 @@ export interface EnrollmentListItem {
   completed_at: Date | null;
   price_amount: string;
   price_currency: string;
+  /** Phase 3 learning summary — derived from server-side progress only. */
+  completion_status: string | null;
+  criteria_version: number | null;
+  completed_lessons: number;
+  total_lessons: number;
+  gradebook_average: string | null;
+  gradebook_attempts: number;
 }
 
 export async function listEnrollmentsForUser(
@@ -633,8 +640,24 @@ export async function listEnrollmentsForUser(
     `SELECT e.id AS enrollment_id, c.id AS course_id, c.slug AS course_slug,
             c.title AS course_title, c.status AS course_status,
             e.status, e.enrolled_at, e.completed_at,
-            c.price_amount::text AS price_amount, c.price_currency
+            c.price_amount::text AS price_amount, c.price_currency,
+            cc.status AS completion_status, cc.criteria_version,
+            COALESCE((
+              SELECT count(*) FROM lesson_progress lp
+                JOIN lessons l ON l.id = lp.lesson_id
+                JOIN modules m ON m.id = l.module_id
+               WHERE lp.user_id = e.user_id AND m.course_id = c.id
+                 AND lp.status = 'completed'), 0)::int AS completed_lessons,
+            COALESCE((
+              SELECT count(*) FROM lessons l JOIN modules m ON m.id = l.module_id
+               WHERE m.course_id = c.id), 0)::int AS total_lessons,
+            cg.average_best_score_percent::text AS gradebook_average,
+            COALESCE(cg.attempt_count, 0)::int AS gradebook_attempts
        FROM enrollments e JOIN courses c ON c.id = e.course_id
+       LEFT JOIN course_completion cc
+              ON cc.user_id = e.user_id AND cc.course_id = c.id
+       LEFT JOIN course_gradebook cg
+              ON cg.user_id = e.user_id AND cg.course_id = c.id
       WHERE e.user_id = $1
       ORDER BY e.enrolled_at DESC`,
     [userId],

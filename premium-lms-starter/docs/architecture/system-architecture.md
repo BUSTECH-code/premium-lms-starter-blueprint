@@ -71,3 +71,12 @@ Protected offline playback is primarily a mobile capability. Browser offline sto
 - Use explicit interfaces around external providers.
 - Log security-sensitive actions without logging secrets or private media tokens.
 - Design for recoverability and observability.
+
+## Phase 4 implementation boundaries
+
+- `packages/shared` holds pure SHA-256/canonicalisation helpers shared by API and web; it introduces no runtime service.
+- `0005_phase4_content_protection.sql` extends media grants with session/user-agent binding, access counts and last-access timestamps.
+- `apps/api/src/media/` owns URL signing, anti-hotlink headers, watermark metadata and authorized delivery; `apps/api/src/learning/routes.ts` owns batch checksum validation and grant issuance.
+- `apps/web/src/learning/progress-sync.ts` owns the browser queue/quarantine; it is not a licence or trust boundary.
+- `apps/web/src/styles/tokens.css`, `app.css`, `phase4.css` and `components/editorial.tsx` own the confirmed editorial baseline.
+- Browser offline storage remains unsuitable for native protected offline playback; native device registration, offline licences and a delivery CDN/provider choice remain Open/deferred.

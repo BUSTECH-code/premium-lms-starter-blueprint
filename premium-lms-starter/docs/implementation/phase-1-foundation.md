@@ -76,3 +76,5 @@ available in this environment) — visual acceptance remains a Phase 2 requireme
 - No email verification, password reset, or MFA (open decisions).
 - No course/commerce/progress API yet — Phase 2/3/4 scope; tables and constraints exist and are
   tested so later phases build on a stable schema.
+
+> **Phase 4 status update (2026-11-05):** the provisional-token note above is superseded. The exact editorial tokens are now **Confirmed** as the official Phase 4 baseline in `docs/design/design-system.md` and `apps/web/src/styles/tokens.css`. This historical Phase 1 log is retained for context.

@@ -100,3 +100,7 @@ If you have permission to save a reference image locally, use these filenames:
 - `luxbridge-notes.png` (only if you have a screenshot and permission to store it)
 
 When local images are added, update this index with their source, the specific design lesson, and any usage restrictions.
+
+## Phase 4 evidence note (2026-11-05)
+
+The six local reference images in `images/` were inspected as design inputs. External source pages were not fetched in this environment. No third-party image was copied into the LMS interface. Automated browser screenshots, rendered viewport captures and side-by-side visual comparison were **Not run**; Phase 4 sign-off uses DOM component tests, typechecking and build verification instead.
