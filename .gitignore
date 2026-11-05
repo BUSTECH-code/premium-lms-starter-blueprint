@@ -1,0 +1,27 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+*.tsbuildinfo
+
+# Runtime data (local databases, generated dev secrets)
+.data/
+
+# Environment files that may contain secrets — only examples are committed
+.env.production
+.env.staging
+.env.local
+.env.*.local
+
+# Logs
+*.log
+npm-debug.log*
+
+# Test/coverage artifacts
+coverage/
+
+# Editor/OS noise
+.DS_Store
+.idea/
+.vscode/

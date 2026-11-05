@@ -1,0 +1,36 @@
+{
+  "name": "premium-lms-starter",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Premium digital academy platform — modular monolith foundation (Phase 1).",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "predev": "tsc -b",
+    "dev": "concurrently -k -n api,web -c cyan,magenta \"npm run dev -w @lms/api\" \"npm run dev -w @lms/web\"",
+    "prebuild": "tsc -b",
+    "build": "npm run build -w @lms/web",
+    "typecheck": "tsc -b && npm run typecheck -w @lms/web",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "migrate": "npm run migrate -w @lms/api",
+    "seed:fixtures": "npm run seed:fixtures -w @lms/api",
+    "clean": "tsc -b --clean && rm -rf apps/web/dist"
+  },
+  "devDependencies": {
+    "@testing-library/dom": "^10.4.2",
+    "@testing-library/react": "^16.3.3",
+    "@types/node": "^26.6.6",
+    "concurrently": "^10.0.6",
+    "jsdom": "^31.0.0",
+    "tsx": "^4.23.15",
+    "typescript": "~5.9.3",
+    "vitest": "^5.1.0"
+  }
+}

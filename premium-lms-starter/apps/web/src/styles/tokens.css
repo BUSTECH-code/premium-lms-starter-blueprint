@@ -1,0 +1,70 @@
+/*
+ * PROVISIONAL design tokens.
+ *
+ * The exact token values are NOT yet approved — see
+ * docs/design/design-system.md ("Exact tokens are not yet approved") and
+ * docs/design/design-direction.md for the premium editorial direction this
+ * foundation follows: restrained colour, strong typography, deliberate
+ * whitespace, no decorative gradients or glass effects.
+ *
+ * Phase 2 replaces these with the approved brand tokens in one place only;
+ * components must keep reading from this file.
+ */
+
+:root {
+  /* Colour — neutral, editorial, high contrast */
+  --color-paper: #faf9f7;
+  --color-surface: #ffffff;
+  --color-ink: #1a1a18;
+  --color-ink-soft: #5d5c57;
+  --color-line: #e4e1da;
+  --color-accent: #1f3a5f;
+  --color-accent-strong: #16293f;
+  --color-on-accent: #ffffff;
+  --color-danger: #8c2f2f;
+  --color-danger-bg: #fbf1f1;
+  --color-success: #276749;
+  --color-success-bg: #eef7f1;
+  --color-focus: #2b6cb0;
+
+  /* Typography — serif display, sans body (system stacks; no web-font network dependency) */
+  --font-display: Georgia, 'Iowan Old Style', 'Times New Roman', serif;
+  --font-body: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  --font-size-xs: 0.8125rem;
+  --font-size-sm: 0.875rem;
+  --font-size-md: 1rem;
+  --font-size-lg: 1.125rem;
+  --font-size-xl: 1.5rem;
+  --font-size-2xl: 2rem;
+
+  --line-height-tight: 1.2;
+  --line-height-body: 1.6;
+
+  /* Spacing scale (4px base) */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+  --space-7: 3rem;
+  --space-8: 4rem;
+
+  /* Layout */
+  --layout-max: 68rem;
+  --layout-narrow: 26rem;
+
+  /* Radii, borders, elevation — restrained */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --shadow-soft: 0 1px 2px rgba(26, 26, 24, 0.06), 0 8px 24px rgba(26, 26, 24, 0.06);
+
+  /* Motion */
+  --duration-fast: 120ms;
+  --ease-standard: cubic-bezier(0.2, 0, 0.2, 1);
+
+  /* Layering */
+  --z-header: 10;
+}
