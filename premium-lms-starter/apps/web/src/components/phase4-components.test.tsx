@@ -58,7 +58,7 @@ describe('Phase 4 shared design components', () => {
     render(
       <>
         <PageIntro
-          eyebrow="Course catalogue"
+          eyebrow="Course Catalog"
           title="Learn with intent"
           lede="Browse published courses."
           testId="intro"

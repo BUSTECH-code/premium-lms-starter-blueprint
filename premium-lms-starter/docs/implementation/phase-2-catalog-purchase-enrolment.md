@@ -6,6 +6,12 @@ purchase with server-verified payment, entitlement-based access) and
 as far as the approved requirements go. Open decisions stay open — nothing
 below invents an answer to O-01/O-05/O-20/O-21.
 
+> **Historical note (superseded in part by Task 1):** the Phase 2 simulated-only
+> provider statements below describe the state at that phase. The owner later
+> explicitly selected Paystack for the live gateway; see
+> `docs/implementation/task-1-paystack-integration.md`. Currency, payment-method
+> and reconciliation details remain Open.
+
 ## What was built
 
 **Database (`packages/db`)**
@@ -121,7 +127,7 @@ sign once; 5/5 consecutive runs green.
 - **No browser E2E or visual-acceptance claims** — no browser tooling exists
   in this environment; HTTP journey tests + jsdom component tests are the
   substitute (per AGENTS.md evidence rules).
-- Real payment gateway, currencies, receipts/taxes: awaiting O-05/O-21.
+- Real payment gateway, currencies, receipts/taxes: awaiting O-05/O-21 at Phase 2. Task 1 later selected Paystack; currency, receipts/taxes and reconciliation remain Open.
 - Refund/chargeback entitlement policy: awaiting O-20 (audit flags only).
 - Withdrawal scheduling,30-day notices and learner notifications
   (course-withdrawal workflow steps1–7) belong to the admin/operations

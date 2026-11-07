@@ -62,14 +62,14 @@ export class LocalFixtureMediaProvider implements MediaProvider {
     try {
       stat = await fs.stat(fullPath);
     } catch {
-      throw new LearningError('media_provider_unavailable', 'Media fixture is missing.');
+      throw new LearningError('media_provider_unavailable', 'Learning resource is temporarily unavailable.');
     }
 
     const expectedSize = Number(asset.file_size_bytes);
     if (stat.size !== expectedSize) {
       throw new LearningError(
         'media_provider_unavailable',
-        'Media fixture size does not match its metadata.',
+        'Learning resource is incomplete.',
       );
     }
     // Integrity verification (development fixtures are small; a managed
@@ -84,7 +84,7 @@ export class LocalFixtureMediaProvider implements MediaProvider {
     if (hash.digest('hex') !== asset.checksum_sha256) {
       throw new LearningError(
         'media_provider_unavailable',
-        'Media fixture failed integrity verification.',
+        'Learning resource failed integrity verification.',
       );
     }
 

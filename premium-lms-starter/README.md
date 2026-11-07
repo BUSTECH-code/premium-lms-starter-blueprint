@@ -65,6 +65,11 @@ Modular monolith with a shared backend API, per `docs/architecture/system-archit
   `PageIntro`/`CourseCover`/`Stepper`/`Stat`/`StatePanel` primitives, five responsive CSS bands and
   consistent loading/empty/error/success/disabled/validation/confirmation states across the five
   requested views. Browser screenshots were Not run.
+- **Paystack checkout (Task 1)**: server-owned transaction initialization with
+  `PAYSTACK_SECRET_KEY`, strict SHA-512 `x-paystack-signature` verification on exact raw bytes,
+  owner-scoped callback verification, browser popup/validated redirect using only the public
+  `VITE_PAYSTACK_PUBLIC_KEY`, and webhook-driven enrolment through the existing idempotent
+  transaction. See `docs/implementation/task-1-paystack-integration.md`.
 
 ## Quick start
 
@@ -73,7 +78,7 @@ Requirements: Node.js >= 22.
 ```bash
 npm install          # install workspace dependencies
 npm run dev          # start API (:4000) + web (:5173) with migrations applied on boot
-npm test             # run the full unit/integration/DOM test suite (258 tests)
+npm test             # run the full unit/integration/DOM test suite (335 tests)
 npm run typecheck    # TypeScript project build + web typecheck
 npm run build        # production build (backend compile + web bundle)
 npm run migrate      # apply pending database migrations explicitly
@@ -81,7 +86,10 @@ npm run seed:fixtures # seed development courses, lessons, quiz questions and lo
 ```
 
 Open <http://localhost:5173>. Register a student account; purchase a seeded course through the
-simulated checkout, then open `/learn/:slug` to use the course player. Promote an account to `admin`
+the configured checkout, then open `/learn/:slug` to use the course player. The
+committed defaults keep preview checkout active; to exercise Paystack locally, set
+`PAYMENT_PROVIDER=paystack`, server-only `PAYSTACK_SECRET_KEY`, matching `PAYSTACK_PUBLIC_KEY`, and
+the browser-safe `VITE_PAYSTACK_PUBLIC_KEY` (test keys only). Promote an account to `admin`
 in the database (or via `PATCH /api/admin/users/:id/roles` once you have an admin) to see the
 administration console.
 
@@ -96,7 +104,9 @@ Environments are strictly separated by `NODE_ENV` (`development` | `test` | `sta
 - `.env.production` / `.env.staging` — never committed; supply through the deployment secret
   store. The server **refuses to boot** in staging/production without external `JWT_SECRET` and
   `MEDIA_SIGNING_SECRET` values (>= 32 chars, placeholders rejected), an explicit `DB_PATH`, HTTPS
-  `WEB_ORIGIN`, and secure cookies.
+  `WEB_ORIGIN`, and secure cookies. With `PAYMENT_PROVIDER=paystack`, it also requires live
+  `PAYSTACK_SECRET_KEY`/`PAYSTACK_PUBLIC_KEY`, the official HTTPS API origin, and an allowlisted
+  callback URL. `PAYSTACK_SECRET_KEY` is never exposed to Vite; `VITE_PAYSTACK_PUBLIC_KEY` is public.
 
 See `.env.example` for the full variable reference.
 
@@ -113,8 +123,10 @@ Phase 3 product decisions Q1–Q4 (`local_authorized_fixtures`, `sequential_expl
 tokens as the official visual baseline, web-only security hardening, a visible non-invasive session
 watermark with checksum-exact PDF downloads, and DOM/typecheck/build sign-off with automated browser
 screenshots **Not run**. Native device registration and offline licensing are deferred; no
-concurrent-session cap was invented. O-11 (assignments), O-15 (notes/bookmarks/resume details),
-O-03, O-05/O-21, O-22–O-28 and certificate design/verification remain open.
+concurrent-session cap was invented. Task 1 resolves the O-05 **payment provider choice** as
+Paystack by explicit owner request; supported currencies, payment methods and reconciliation policy
+remain Open. O-11 (assignments), O-15 (notes/bookmarks/resume details), O-03, O-21, O-22–O-28 and
+certificate design/verification remain open.
 
 When a decision changes, update the relevant source document and record the reason. Do not
 silently contradict another document.

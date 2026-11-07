@@ -111,10 +111,11 @@ export async function createCheckout(
   const { rows: openRows } = await db.query<{ id: string }>(
     `SELECT o.id FROM orders o JOIN order_items oi ON oi.order_id = o.id
       WHERE o.user_id = $1 AND oi.course_id = $2
+        AND EXISTS (SELECT 1 FROM payments p WHERE p.order_id = o.id AND p.provider = $3)
         AND (o.status = 'created' OR o.status = 'payment_pending')
         AND o.expires_at IS NOT NULL AND o.expires_at > now()
       ORDER BY o.created_at DESC LIMIT 1`,
-    [userId, course.id],
+    [userId, course.id, deps.provider.name],
   );
   const openId = openRows[0]?.id;
   if (openId) {
@@ -125,7 +126,7 @@ export async function createCheckout(
   try {
     const { order } = await createOrder(db, {
       userId,
-      provider: deps.env.commerce.provider,
+      provider: deps.provider.name,
       checkoutTtlMinutes: deps.env.commerce.checkoutTtlMinutes,
       course: {
         id: course.id,
@@ -219,7 +220,7 @@ export async function completeSimulatedCheckout(
   const { db } = deps;
   const view = await getOwnedOrderByPaymentRef(
     db,
-    deps.env.commerce.provider,
+    deps.provider.name,
     providerReference,
     userId,
   );

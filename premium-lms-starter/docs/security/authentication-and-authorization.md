@@ -39,3 +39,10 @@
 - Signed URLs are bound to the authenticated session; a different session receives `media_session_mismatch` rather than access.
 - Anti-hotlink checks add no-store, noindex, `Vary` and `Cross-Origin-Resource-Policy` headers.
 - Session duration and concurrent session/device policy remain **Open**; Phase 4 does not implement a concurrent-session cap.
+
+## Task 1 Paystack additions
+
+- `PAYSTACK_SECRET_KEY` is server-only. In staging/production it must be a live `sk_live_` key matching a live `pk_live_` public key; no real credential is committed.
+- `/api/checkout/webhook` is exempt from browser Origin/CSRF checks because it is authenticated by a constant-time SHA-512 HMAC over the exact raw body in `x-paystack-signature`. Missing, malformed, forged or body-mutated signatures return `401 invalid_signature`.
+- `/api/checkout/initialize` and `/api/checkout/verify/:reference` remain authenticated, owner-scoped and checkout-rate-limited. Callback URLs and Paystack API origins are validated against configured environment values, never client input.
+- `VITE_PAYSTACK_PUBLIC_KEY` is public browser configuration only; the secret key is never placed in a Vite bundle.

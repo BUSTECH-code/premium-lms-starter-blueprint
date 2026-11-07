@@ -122,3 +122,32 @@ Live tutoring, live classes, mentorship and other learning products require sepa
 > **Future mobile note:** the Phase 6 items above are not Phase 4 acceptance criteria. The Phase 4
 > approval explicitly defers native device registration and offline licensing; browser queue
 > integrity is not equivalent to protected in-app offline playback.
+
+## Task 1 addendum — Paystack integration and transaction hardening (2026-11-06)
+
+Owner-selected Paystack resolves the provider portion of O-05 without closing currency,
+payment-method or reconciliation decisions. Server-owned initialization, exact raw-body SHA-512
+webhook verification, owner-scoped callback verification and the existing idempotent enrolment
+transaction were implemented. Browser checkout uses only the public `VITE_PAYSTACK_PUBLIC_KEY`;
+`PAYSTACK_SECRET_KEY` remains server-only. Exit: `npm test` (`32 files / 278 tests`) and
+`npm run typecheck` passed. See `docs/implementation/task-1-paystack-integration.md`.
+
+
+## Task 2 addendum — jargon purge, design polish and production sign-off (2026-11-07)
+
+Task 2 replaced implementation jargon in user-facing UI, headings, empty/error states, API messages
+and seeded public content with commercial SaaS language: `Course Catalog`, `Learning Center`,
+`Secure Checkout` and `Included capabilities`. Browser-facing checkout routes and API prefixes moved
+from `/checkout/simulated/…` and `/api/simulated/checkout/…` to `/checkout/preview/…` and
+`/api/checkout/preview/…`; internal provider identifiers, env variables and historical phase records
+were intentionally preserved. `app.css` legacy breakpoints were reconciled to the five confirmed
+responsive bands, raw spacing values were tokenized, and the app shell gained explicit banner /
+contentinfo roles, a clearer primary-navigation label and keyboard/skip-link assertions.
+
+New automated regression tests lock the purge and design/accessibility guarantees. Exit:
+`npm test` (`34 files / 335 tests`), `npm run typecheck`, `npm run build` and `git diff --check` all
+passed with zero warnings. Automated browser screenshots/rendered visual comparison, real-device
+checks, live-money Paystack testing, performance/accessibility browser inspection and production
+credentials were **Not run**; historical Open decisions remain open. Commercial deployment sign-off
+is limited to the 100% green automated gates. See
+`docs/implementation/task-2-final-polish-and-production-signoff.md`.

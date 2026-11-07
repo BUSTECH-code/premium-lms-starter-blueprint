@@ -197,8 +197,8 @@ async function handleRefund(
 }
 
 /**
- * Full pipeline entry point. `rawBody` must be the exact bytes that were
- * signed — never a re-serialised object.
+ * Full pipeline entry point for signed provider POSTs. `rawBody` must be the
+ * exact bytes that were signed — never a re-serialised object.
  */
 export async function processPaymentWebhook(
   deps: WebhookDeps,
@@ -219,14 +219,32 @@ export async function processPaymentWebhook(
   if (!eventResult.success) {
     throw new AppError(400, 'invalid_event', 'Webhook event does not match the event schema.');
   }
-  const event: PaymentEvent = eventResult.data;
+  return processVerifiedPaymentEvent(deps, eventResult.data, parsed);
+}
+
+/**
+ * Reusable pipeline for a provider fact that has already been authenticated
+ * (a verified webhook signature, or a server-side verify API call made with
+ * our secret). Paystack webhooks and callback verification both land here, so
+ * receipts, money re-validation and enrolment grants stay identical.
+ */
+export async function processVerifiedPaymentEvent(
+  deps: WebhookDeps,
+  event: PaymentEvent,
+  payload: unknown = event,
+): Promise<WebhookResult> {
+  const eventResult = paymentEventSchema.safeParse(event);
+  if (!eventResult.success) {
+    throw new AppError(400, 'invalid_event', 'Webhook event does not match the event schema.');
+  }
+  const verifiedEvent = eventResult.data;
 
   // Idempotent receipt: the same event id never processes twice.
   const receipt = await insertPaymentEvent(deps.db, {
     provider: deps.provider.name,
-    eventId: event.id,
-    eventType: event.type,
-    payload: parsed,
+    eventId: verifiedEvent.id,
+    eventType: verifiedEvent.type,
+    payload,
   });
   if (!receipt.inserted) {
     // Exact event-id replay: never reprocessed; report the prior outcome.
@@ -235,7 +253,7 @@ export async function processPaymentWebhook(
 
   let result: WebhookResult;
   try {
-    result = await dispatch(deps, event);
+    result = await dispatch(deps, verifiedEvent);
   } catch (error) {
     await finishPaymentEvent(deps.db, receipt.id, 'quarantined');
     throw error;

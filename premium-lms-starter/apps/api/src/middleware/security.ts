@@ -60,10 +60,23 @@ export function cors(env: Env): RequestHandler {
  *    are blocked by CORS preflight).
  * Anything else is rejected with 403.
  */
+const PROVIDER_WEBHOOK_PATHS = new Set([
+  '/api/checkout/webhook',
+  '/api/webhooks/payments',
+]);
+
 export function originCheck(env: Env): RequestHandler {
   return (req: Request, res: Response, next: NextFunction) => {
     const method = req.method.toUpperCase();
     if (method === 'GET' || method === 'HEAD' || method === 'OPTIONS') {
+      next();
+      return;
+    }
+
+    // Provider callbacks are not browser session requests: their authenticity
+    // comes from an HMAC signature. Some gateways send a non-web Origin header,
+    // which must not turn a genuinely signed webhook into a CSRF rejection.
+    if (PROVIDER_WEBHOOK_PATHS.has(req.path)) {
       next();
       return;
     }

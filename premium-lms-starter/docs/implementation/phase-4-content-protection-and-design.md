@@ -55,7 +55,7 @@ Native mobile device registration, native offline licensing and a concurrent-ses
 - **Progressive sync integrity:** browser queue checksum, per-lesson sequences, canonical batch digest, terminal 4xx quarantine and server-side validation. Client checks are integrity/tamper detection, not a trust boundary.
 - **Watermark:** email + short opaque session reference + timestamp, visible but non-invasive. Downloadable PDF/video fixtures are served byte-for-byte with exact stored SHA-256 metadata; no asset mutation.
 - **Visual integration:** shared page intros, typographic course covers from real metadata, checkout stepper, dashboard stats, state panels and five responsive bands. No gradients, glass effects, fake ratings/testimonials, borrowed reference imagery or per-component arbitrary colours.
-- **Deferred/Open:** native device registration, 90-day native offline licences, concurrent-session policy, no invented 2-session cap. O-11, O-15, O-03, O-05/O-21, certificate design/verification, O-22–O-28, O-06/O-07/O-08, delivery-provider/CDN choice and exact screenshot viewport widths remain Open.
+- **Deferred/Open:** native device registration, 90-day native offline licences, concurrent-session policy, no invented 2-session cap. O-11, O-15, O-03, O-05 currency/payment-method/reconciliation details, O-21, certificate design/verification, O-22–O-28, O-06/O-07/O-08, delivery-provider/CDN choice and exact screenshot viewport widths remain Open. This line records the Phase 4 scope; Task 1 later selected Paystack as the payment provider by explicit owner request.
 
 ## 4. Commands and results actually run
 

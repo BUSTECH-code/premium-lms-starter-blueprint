@@ -10,6 +10,7 @@ import {
   parseEnv,
   readEnvFile,
 } from '../src/config/env.js';
+import { TEST_PAYSTACK_PUBLIC_KEY, TEST_PAYSTACK_SECRET_KEY } from './helpers.js';
 
 describe('parseEnv — development/test defaults', () => {
   it('generates a strong ephemeral secret when none is provided', () => {
@@ -106,6 +107,93 @@ describe('parseEnv — commerce (Phase 2)', () => {
     expect(env.rateLimit.checkout.windowSeconds).toBe(300);
     const overridden = parseEnv({ ...testBase, RATE_LIMIT_CHECKOUT_MAX_ATTEMPTS: '5' });
     expect(overridden.rateLimit.checkout.maxAttempts).toBe(5);
+  });
+});
+
+describe('parseEnv — Paystack (Task 1)', () => {
+  const testBase = { NODE_ENV: 'test', DB_PATH: 'memory:' };
+  const paystackBase = {
+    ...testBase,
+    PAYMENT_PROVIDER: 'paystack',
+    PAYSTACK_SECRET_KEY: TEST_PAYSTACK_SECRET_KEY,
+    PAYSTACK_PUBLIC_KEY: TEST_PAYSTACK_PUBLIC_KEY,
+  };
+  const stagingBase = {
+    NODE_ENV: 'staging',
+    DB_PATH: 'memory:',
+    JWT_SECRET: 'x'.repeat(40),
+    MEDIA_SIGNING_SECRET: 'stage-media-signing-key-9f3a7c1e5b2d8a4f',
+    WEB_ORIGIN: 'https://staging.academy.example.com',
+  };
+
+  it('enables Paystack with server-owned callback and API URLs', () => {
+    const env = parseEnv(paystackBase);
+    expect(env.commerce.provider).toBe('paystack');
+    expect(env.commerce.simulationEnabled).toBe(false);
+    expect(env.paystack.enabled).toBe(true);
+    expect(env.paystack.secretKey).toBe(TEST_PAYSTACK_SECRET_KEY);
+    expect(env.paystack.publicKey).toBe(TEST_PAYSTACK_PUBLIC_KEY);
+    expect(env.paystack.apiBaseUrl).toBe('https://api.paystack.co');
+    expect(env.paystack.callbackUrl).toBe('http://localhost:5173/checkout/paystack/callback');
+  });
+
+  it('requires both keys, matching modes and non-placeholder values', () => {
+    expect(() =>
+      parseEnv({ ...testBase, PAYMENT_PROVIDER: 'paystack' }),
+    ).toThrow(/PAYSTACK_SECRET_KEY/);
+    expect(() =>
+      parseEnv({
+        ...testBase,
+        PAYMENT_PROVIDER: 'paystack',
+        PAYSTACK_SECRET_KEY: TEST_PAYSTACK_SECRET_KEY,
+      }),
+    ).toThrow(/PAYSTACK_PUBLIC_KEY/);
+    expect(() =>
+      parseEnv({
+        ...paystackBase,
+        PAYSTACK_PUBLIC_KEY: 'pk_live_lms_unit_live_public_key',
+      }),
+    ).toThrow(/same test\/live mode/);
+    expect(() =>
+      parseEnv({ ...paystackBase, PAYSTACK_SECRET_KEY: 'sk_test_placeholder_key_value' }),
+    ).toThrow(/placeholder/);
+  });
+
+  it('requires live keys and the official API origin in production-like environments', () => {
+    expect(() =>
+      parseEnv({ ...stagingBase, ...paystackBase, NODE_ENV: 'staging', DB_PATH: 'memory:' }),
+    ).toThrow(/Live sk_live_/);
+    const env = parseEnv({
+      ...stagingBase,
+      PAYMENT_PROVIDER: 'paystack',
+      PAYSTACK_SECRET_KEY: 'sk_live_lms_unit_live_secret_key',
+      PAYSTACK_PUBLIC_KEY: 'pk_live_lms_unit_live_public_key',
+    });
+    expect(env.paystack.enabled).toBe(true);
+    expect(() =>
+      parseEnv({
+        ...stagingBase,
+        PAYMENT_PROVIDER: 'paystack',
+        PAYSTACK_SECRET_KEY: 'sk_live_lms_unit_live_secret_key',
+        PAYSTACK_PUBLIC_KEY: 'pk_live_lms_unit_live_public_key',
+        PAYSTACK_API_BASE_URL: 'https://gateway.example.com',
+      }),
+    ).toThrow(/https:\/\/api\.paystack\.co/);
+  });
+
+  it('rejects callback URLs outside the configured browser origins', () => {
+    expect(() =>
+      parseEnv({
+        ...paystackBase,
+        PAYSTACK_CALLBACK_URL: 'https://evil.example/checkout/paystack/callback',
+      }),
+    ).toThrow(/WEB_ORIGIN/);
+    expect(() =>
+      parseEnv({
+        ...paystackBase,
+        PAYSTACK_CALLBACK_URL: 'http://localhost:5173/checkout/something-else',
+      }),
+    ).toThrow(/checkout\/paystack\/callback/);
   });
 });
 

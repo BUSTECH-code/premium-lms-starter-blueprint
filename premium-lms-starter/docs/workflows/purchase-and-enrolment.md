@@ -39,9 +39,18 @@ Grant course access only after the payment provider confirms a successful paymen
 - Store event IDs and provider references for idempotency.
 - Log decisions without exposing credentials or payment secrets.
 
+## Task 1 implementation notes
+
+- Paystack is the confirmed provider. `POST /api/checkout/initialize` creates a server-priced order
+  and Paystack reference; `POST /api/checkout/webhook` verifies `x-paystack-signature` over exact
+  raw bytes; `GET /api/checkout/verify/:reference` is the owner-scoped callback fallback.
+- Both successful-charge paths record an idempotent `payment_events` receipt and use the existing
+  transactional entitlement/enrolment grant. No browser-supplied price, status or redirect is trusted.
+- `PAYSTACK_SECRET_KEY` stays server-only; `VITE_PAYSTACK_PUBLIC_KEY` is browser-safe public config.
+
 ## Open decisions
 
-- Payment provider and supported methods.
+- Supported Paystack payment methods.
 - Currency and tax handling.
 - Receipt/invoice requirements.
 - Exact refund, duplicate charge and chargeback procedures.

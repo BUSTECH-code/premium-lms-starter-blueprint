@@ -103,7 +103,7 @@ export function AccountPage() {
       data-responsive-layout="stacked-mobile split-tablet grid-desktop"
     >
       <PageIntro
-        eyebrow="Account dashboard"
+        eyebrow="Learning Center"
         title={user.name}
         lede="Your courses, progress and gradebook in one place."
         className="dashboard-hero"
@@ -144,10 +144,10 @@ export function AccountPage() {
         <div className="section-head">
           <div>
             <p className="eyebrow">Continue learning</p>
-            <h2 id="library-title">Your courses</h2>
+            <h2 id="library-title">Course Library</h2>
           </div>
           <Link className="button secondary" to="/courses">
-            Browse the catalogue
+            Browse the Course Catalog
           </Link>
         </div>
 
@@ -155,7 +155,7 @@ export function AccountPage() {
           <StatePanel
             kind="loading"
             title="Loading your courses"
-            description="Fetching enrolments, progress and gradebook summaries."
+            description="Fetching enrollments, progress and gradebook summaries."
             testId="library-loading-state"
           >
             <Spinner label="Loading your courses…" />
@@ -163,7 +163,7 @@ export function AccountPage() {
         ) : libraryError ? (
           <StatePanel
             kind="error"
-            title="Library unavailable"
+            title="Learning Center unavailable"
             description={libraryError}
             testId="library-error-state"
           />
@@ -175,7 +175,7 @@ export function AccountPage() {
             testId="library-empty-state"
           >
             <Link className="button secondary" to="/courses">
-              Browse the catalogue
+              Browse the Course Catalog
             </Link>
           </StatePanel>
         ) : (
@@ -280,18 +280,17 @@ export function AccountPage() {
         )}
       </section>
 
-      <section className="panel whats-live-panel" aria-labelledby="whats-live-title">
-        <h2 id="whats-live-title">What's live</h2>
+      <section className="panel whats-live-panel" aria-labelledby="included-title">
+        <h2 id="included-title">Included capabilities</h2>
         <p className="muted">
-          Catalogue browsing, purchase with the simulated payment provider, automatic enrolment,
-          the sequential course player, explicit lesson completion, objective quiz grading and a
-          server-side gradebook are live. Phase 4 adds short-lived signed media grants, anti-hotlink
-          checks, a session watermark, checksummed progressive sync and the confirmed editorial
-          design system. Certificates are deliberately not issued in this phase.
+          Course Catalog browsing, secure checkout, automatic enrollment, guided lessons,
+          explicit lesson completion, objective quiz grading and a reliable gradebook are included.
+          Protected resources, session watermarks and a consistent visual system are included too.
+          Certificates are deliberately not issued.
         </p>
         <div className="page-actions">
           <Link className="button secondary" to="/courses">
-            Browse the catalogue
+            Browse the Course Catalog
           </Link>
           {can(user, 'users.read') ? (
             <Link className="button secondary" to="/admin">

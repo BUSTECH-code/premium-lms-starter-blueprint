@@ -29,7 +29,8 @@
 - **Confirmed:** Successful server-verified payment grants entitlement.
 - **Confirmed:** Failed, pending or unverified payment does not grant entitlement.
 - **Confirmed:** Payment, order, enrolment and entitlement are distinct records/concepts.
-- **Open:** Payment provider, currencies, payment methods and reconciliation policy.
+- **Confirmed (Task 1):** Paystack is the live payment provider, selected explicitly by the owner.
+- **Open:** Supported currencies, payment methods and reconciliation policy. `NGN` remains a development placeholder.
 - **Confirmed:** No voluntary refunds as the intended policy, subject to legally required refunds, erroneous/duplicate charges, payment reversals, chargebacks and applicable provider/legal requirements.
 
 ### Course and lesson management

@@ -92,3 +92,39 @@ still-open decisions.
 
 See `docs/implementation/phase-4-content-protection-and-design.md` for the full completion report
 and still-open decisions.
+
+## Task 1 Paystack evidence status (2026-11-06)
+
+- `npm test -- --reporter=dot`: **Passed** — `32 files / 278 tests`. New Paystack coverage includes
+  adapter signature/amount primitives, server-priced `POST /api/checkout/initialize`, strict
+  `x-paystack-signature` denial/acceptance on exact raw bytes, webhook-driven enrolment and
+  idempotent replay, owner-scoped `GET /api/checkout/verify/:reference`, non-success callback
+  verification, env key/callback validation, browser config, Paystack Inline popup, validated
+  redirect fallback, callback granted/held states and the existing full Phase 1–4 suites.
+- `npm run typecheck`: **Passed** — `tsc -b && npm run typecheck -w @lms/web`.
+- Live Paystack HTTP calls: **Stubbed in tests**. Clearly fake `sk_test_`/`pk_test_` keys are used;
+  no real credential or live gateway request was made.
+- `npm run build`, migration, seed, commit, push and PR: **Not requested / not run** for Task 1.
+- Automated browser screenshots and real-device payment testing: **Not run**. Frontend sign-off uses
+  jsdom component tests; no visual comparison or live-money claim is made.
+
+See `docs/implementation/task-1-paystack-integration.md` for the Task 1 completion report.
+
+
+## Task 2 final polish evidence status (2026-11-07)
+
+- `npm test -- --reporter=dot`: **Passed** — `34 files / 335 tests`, duration `269.12s`. New
+  regression suites cover user-facing product language, API response/seeded content language,
+  commercial checkout routes, WCAG AA token contrast, typography/spacing token use, five
+  responsive bands, landmarks, skip-link focus order, accessible names and keyboard reachability.
+- `npm run typecheck`: **Passed** — `tsc -b && npm run typecheck -w @lms/web`; zero type errors.
+- `npm run build`: **Passed** — Vite v8.3.6, 47 modules, CSS `38.03 kB` (gzip `6.79 kB`), JS
+  `337.27 kB` (gzip `102.51 kB`), built in `463ms`.
+- Warning scan of the test, typecheck and build logs: **none**.
+- `git diff --check`: **Passed**.
+- Automated browser screenshots, rendered viewport comparison, real-device checks, live-money
+  Paystack testing, performance/accessibility browser inspection and production credentials:
+  **Not run / unresolved**. Historical Open requirements remain Open; no visual acceptance or
+  live-money claim is made.
+- Commercial deployment sign-off is therefore limited to the automated gates: all requested
+  automated checks are 100% green. See `docs/implementation/task-2-final-polish-and-production-signoff.md`.

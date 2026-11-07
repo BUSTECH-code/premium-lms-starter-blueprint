@@ -22,12 +22,22 @@ import {
 } from '../middleware/validate.js';
 import { createPaymentProvider, type PaymentProvider } from '../payments/provider.js';
 import {
+  PAYSTACK_SIGNATURE_HEADER,
+  PaystackClient,
+} from '../payments/paystack.js';
+import {
   cancelCheckout,
   completeSimulatedCheckout,
   createCheckout,
   toCheckoutView,
   type CheckoutDeps,
 } from './checkout-service.js';
+import {
+  initializePaystackCheckout,
+  processPaystackWebhook,
+  verifyPaystackCheckout,
+  type PaystackServiceDeps,
+} from './paystack-service.js';
 import { processPaymentWebhook } from './webhook-service.js';
 
 const createOrderBodySchema = z.object({
@@ -85,8 +95,18 @@ export function createCommerceRouter(deps: CommerceRouterDeps): Router {
   const provider: PaymentProvider = createPaymentProvider({
     provider: env.commerce.provider,
     webhookSecret: env.commerce.webhookSecret,
+    paystackSecretKey: env.paystack.secretKey,
   });
   const checkout: CheckoutDeps = { env, db, provider };
+  const paystack: PaystackServiceDeps | null = env.paystack.enabled
+    ? {
+        ...checkout,
+        client: new PaystackClient({
+          secretKey: env.paystack.secretKey,
+          apiBaseUrl: env.paystack.apiBaseUrl,
+        }),
+      }
+    : null;
 
   const checkoutLimit = rateLimit({
     limiter: checkoutLimiter,
@@ -114,8 +134,8 @@ export function createCommerceRouter(deps: CommerceRouterDeps): Router {
           payment: view.payment,
           reused,
           checkoutUrl:
-            view.payment && env.commerce.simulationEnabled
-              ? `/checkout/simulated/${view.payment.providerReference}`
+            view.payment && env.commerce.simulationEnabled && provider.name === 'simulated'
+              ? `/checkout/preview/${view.payment.providerReference}`
               : null,
         });
       } catch (error) {
@@ -209,12 +229,100 @@ export function createCommerceRouter(deps: CommerceRouterDeps): Router {
   );
 
   // --------------------------------------------------------------------------
-  // Simulated checkout (only mounted when simulationEnabled)
+  // Live Paystack checkout (only enabled when PAYMENT_PROVIDER=paystack)
+  // --------------------------------------------------------------------------
+  router.post(
+    '/checkout/initialize',
+    authenticate(env, db),
+    checkoutLimit,
+    validateBody(createOrderBodySchema),
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        if (!paystack) {
+          throw errors.notFound('not_found', 'Paystack checkout is not enabled.');
+        }
+        const auth = req.auth;
+        if (!auth) throw errors.unauthorized();
+        const body = req.body as z.infer<typeof createOrderBodySchema>;
+        const result = await initializePaystackCheckout(
+          paystack,
+          auth.user.id,
+          auth.user.email,
+          body.courseSlug,
+        );
+        logger.info(
+          { reference: result.reference, reused: result.reused },
+          'paystack checkout initialized',
+        );
+        res.json(result);
+      } catch (error) {
+        next(error);
+      }
+    },
+  );
+
+  // Provider callbacks are unauthenticated but HMAC-verified on the exact raw
+  // body. They are asynchronous relative to the browser checkout and use the
+  // same idempotent receipt + enrolment transaction as the verify fallback.
+  router.post(
+    '/checkout/webhook',
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        if (!paystack) {
+          throw errors.notFound('not_found', 'Paystack webhook is not enabled.');
+        }
+        const rawBody: Buffer | undefined = (req as Request & { rawBody?: Buffer }).rawBody;
+        if (!rawBody) {
+          throw new AppError(400, 'invalid_event', 'Raw request body is required.');
+        }
+        const signatureValue = req.headers[PAYSTACK_SIGNATURE_HEADER];
+        const signature = typeof signatureValue === 'string' ? signatureValue : undefined;
+        const result = await processPaystackWebhook(paystack, rawBody, signature);
+        logger.info(
+          { status: result.status, reason: result.reason },
+          'paystack webhook processed',
+        );
+        res.status(200).json(result);
+      } catch (error) {
+        next(error);
+      }
+    },
+  );
+
+  // Frontend callback fallback: owner-scoped, rate-limited, and verified with
+  // the server secret before any fulfilment decision is returned.
+  router.get(
+    '/checkout/verify/:reference',
+    authenticate(env, db),
+    checkoutLimit,
+    validateParams(referenceParamsSchema),
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        if (!paystack) {
+          throw errors.notFound('not_found', 'Paystack checkout is not enabled.');
+        }
+        const auth = req.auth;
+        if (!auth) throw errors.unauthorized();
+        const { reference } = getValidatedParams<z.infer<typeof referenceParamsSchema>>(req);
+        const result = await verifyPaystackCheckout(paystack, auth.user.id, reference);
+        logger.info(
+          { reference, status: result.status, accessGranted: result.accessGranted },
+          'paystack checkout verified',
+        );
+        res.json(result);
+      } catch (error) {
+        next(error);
+      }
+    },
+  );
+
+  // --------------------------------------------------------------------------
+  // Preview checkout (only mounted when simulationEnabled)
   // --------------------------------------------------------------------------
   if (env.commerce.simulationEnabled) {
-    // GET /api/simulated/checkout/:reference — checkout session for the owner
+    // GET /api/checkout/preview/:reference — checkout session for the owner
     router.get(
-      '/simulated/checkout/:reference',
+      '/checkout/preview/:reference',
       authenticate(env, db),
       validateParams(referenceParamsSchema),
       async (req: Request, res: Response, next: NextFunction) => {
@@ -224,7 +332,7 @@ export function createCommerceRouter(deps: CommerceRouterDeps): Router {
           const { reference } = getValidatedParams<z.infer<typeof referenceParamsSchema>>(req);
           const view = await getOwnedOrderByPaymentRef(
             db,
-            env.commerce.provider,
+            provider.name,
             reference,
             auth.user.id,
           );
@@ -255,10 +363,10 @@ export function createCommerceRouter(deps: CommerceRouterDeps): Router {
       },
     );
 
-    // POST /api/simulated/checkout/:reference/complete — simulate gateway result.
-    // Builds a signed provider event and runs the real webhook pipeline.
+    // POST /api/checkout/preview/:reference/complete — confirm preview result.
+    // Builds a signed provider event and runs the secure verification workflow.
     router.post(
-      '/simulated/checkout/:reference/complete',
+      '/checkout/preview/:reference/complete',
       authenticate(env, db),
       checkoutLimit,
       validateParams(referenceParamsSchema),
@@ -297,7 +405,7 @@ export function createCommerceRouter(deps: CommerceRouterDeps): Router {
     '/webhooks/payments',
     async (req: Request, res: Response, next: NextFunction) => {
       try {
-        if (!env.commerce.simulationEnabled) {
+        if (!env.commerce.simulationEnabled || provider.name !== 'simulated') {
           throw errors.notFound('not_found', 'Webhook endpoint is not enabled.');
         }
         const rawBody: Buffer | undefined = (req as Request & { rawBody?: Buffer }).rawBody;

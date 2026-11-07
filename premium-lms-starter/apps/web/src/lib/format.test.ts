@@ -13,8 +13,8 @@ describe('formatPrice', () => {
   });
 
   it('keeps the currency code visible for unknown/placeholder currencies', () => {
-    // Well-formed but unassigned codes (placeholder currencies while O-05/O-21
-    // are open) still render with the code and amount intact.
+    // Well-formed but unassigned codes (placeholder currencies while O-21
+    // is open) still render with the code and amount intact.
     const formatted = formatPrice('10.00', 'XYZ');
     expect(formatted).toContain('XYZ');
     expect(formatted).toContain('10.00');

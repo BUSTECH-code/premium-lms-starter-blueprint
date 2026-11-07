@@ -58,11 +58,11 @@ afterEach(() => {
 
 function renderCheckout() {
   return render(
-    <MemoryRouter initialEntries={['/checkout/simulated/simulated_abc12345']}>
+    <MemoryRouter initialEntries={['/checkout/preview/simulated_abc12345']}>
       <AuthProvider>
         <Routes>
           <Route
-            path="/checkout/simulated/:reference"
+            path="/checkout/preview/:reference"
             element={<SimulatedCheckoutPage />}
           />
         </Routes>
@@ -71,11 +71,11 @@ function renderCheckout() {
   );
 }
 
-describe('SimulatedCheckoutPage', () => {
-  it('renders the order summary and both simulated payment outcomes', async () => {
+describe('Preview checkout page', () => {
+  it('renders the order summary and both checkout outcomes', async () => {
     stubFetch({
       '/api/auth/me': { user: student },
-      '/api/simulated/checkout/': openSession,
+      '/api/checkout/preview/': openSession,
     });
     renderCheckout();
 
@@ -89,20 +89,20 @@ describe('SimulatedCheckoutPage', () => {
       'confirmation',
     );
     expect(screen.getByText(/25,000/)).toBeTruthy();
-    expect(screen.getByText(/simulated payment provider/i)).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Simulate successful payment' })).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Simulate failed payment' })).toBeTruthy();
+    expect(screen.getByText(/safe checkout preview/i)).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Confirm successful payment' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Decline payment' })).toBeTruthy();
   });
 
-  it('grants access after a successful simulated payment', async () => {
+  it('grants access after a successful payment', async () => {
     const fetchMock = stubFetch({
       '/api/auth/me': { user: student },
-      '/api/simulated/checkout/simulated_abc12345/complete': paidResult,
-      '/api/simulated/checkout/': openSession,
+      '/api/checkout/preview/simulated_abc12345/complete': paidResult,
+      '/api/checkout/preview/': openSession,
     });
     renderCheckout();
 
-    const payButton = await screen.findByRole('button', { name: 'Simulate successful payment' });
+    const payButton = await screen.findByRole('button', { name: 'Confirm successful payment' });
     fireEvent.click(payButton);
 
     expect(await screen.findByRole('heading', { name: 'Access granted' })).toBeTruthy();
@@ -121,10 +121,10 @@ describe('SimulatedCheckoutPage', () => {
     expect(jsonRequest(completeCall?.[1])).toEqual({ outcome: 'success' });
   });
 
-  it('shows a failed state with retry when the simulated payment fails', async () => {
+  it('shows a declined state with retry when the payment fails', async () => {
     stubFetch({
       '/api/auth/me': { user: student },
-      '/api/simulated/checkout/simulated_abc12345/complete': {
+      '/api/checkout/preview/simulated_abc12345/complete': {
         event: { id: 'evt_2', type: 'payment.failed' },
         status: 'processed',
         granted: false,
@@ -135,16 +135,16 @@ describe('SimulatedCheckoutPage', () => {
           payment: { ...openSession.checkout.payment, status: 'failed' },
         },
       },
-      '/api/simulated/checkout/': openSession,
+      '/api/checkout/preview/': openSession,
     });
     renderCheckout();
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Simulate failed payment' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Decline payment' }));
 
-    expect(await screen.findByRole('heading', { name: 'Payment failed' })).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: 'Payment declined' })).toBeTruthy();
     expect(screen.getByTestId('checkout-status').getAttribute('data-state')).toBe('error');
     expect(
-      screen.getByRole('button', { name: 'Retry with a successful payment' }),
+      screen.getByRole('button', { name: 'Try a successful payment again' }),
     ).toBeTruthy();
     expect(screen.queryByRole('heading', { name: 'Access granted' })).toBeNull();
   });
@@ -152,7 +152,7 @@ describe('SimulatedCheckoutPage', () => {
   it('reports a quarantined payment as held for review without granting access', async () => {
     stubFetch({
       '/api/auth/me': { user: student },
-      '/api/simulated/checkout/simulated_abc12345/complete': {
+      '/api/checkout/preview/simulated_abc12345/complete': {
         event: { id: 'evt_3', type: 'payment.succeeded' },
         status: 'quarantined',
         reason: 'amount_mismatch',
@@ -160,11 +160,11 @@ describe('SimulatedCheckoutPage', () => {
         enrollmentCreated: false,
         checkout: openSession.checkout,
       },
-      '/api/simulated/checkout/': openSession,
+      '/api/checkout/preview/': openSession,
     });
     renderCheckout();
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Simulate successful payment' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Confirm successful payment' }));
 
     expect(await screen.findByRole('heading', { name: 'Payment held for review' })).toBeTruthy();
     expect(screen.getByTestId('checkout-status').getAttribute('data-state')).toBe(
@@ -176,7 +176,7 @@ describe('SimulatedCheckoutPage', () => {
   it('shows a not-found state for unknown checkout references', async () => {
     stubFetch({
       '/api/auth/me': { user: student },
-      '/api/simulated/checkout/': undefined,
+      '/api/checkout/preview/': undefined,
     });
     renderCheckout();
 

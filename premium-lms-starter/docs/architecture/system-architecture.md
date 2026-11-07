@@ -29,7 +29,8 @@ Do not split into microservices for the initial release. Keep clear logical doma
    - Shared backend API.
    - Protected in-app offline learning.
 6. External integrations
-   - Payment provider (open).
+   - Paystack (confirmed payment provider for Task 1): server-side initialize/verify API,
+     strict `x-paystack-signature` webhooks, and browser-safe Paystack Inline/redirect.
    - Notification provider (open).
    - Google Drive API.
 

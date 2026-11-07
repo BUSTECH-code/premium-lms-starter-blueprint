@@ -1,13 +1,13 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
+import { PaystackPaymentProvider } from './paystack.js';
 
 /**
  * Payment provider seam.
  *
- * The real gateway decision is OPEN (O-05) — this interface is the only
- * contract the commerce layer depends on, so a future provider drops in
- * without touching order/entitlement logic. Until O-05 is approved the sole
- * implementation is the simulated provider below; the API never claims to be
- * connected to a real gateway.
+ * The product owner selected Paystack for the live gateway integration; the
+ * simulated provider remains available for local development and tests. This
+ * interface is the only contract the commerce layer depends on, so both
+ * providers use the same order/entitlement pipeline.
  */
 export interface PaymentProvider {
   readonly name: string;
@@ -51,12 +51,19 @@ export class SimulatedPaymentProvider implements PaymentProvider {
 }
 
 export function createPaymentProvider(config: {
-  provider: string;
+  provider: 'simulated' | 'paystack';
   webhookSecret: string;
+  paystackSecretKey?: string;
 }): PaymentProvider {
   if (config.provider === 'simulated') {
     return new SimulatedPaymentProvider(config.webhookSecret);
   }
+  if (config.provider === 'paystack') {
+    if (!config.paystackSecretKey) {
+      throw new Error('PAYSTACK_SECRET_KEY is required for Paystack payments.');
+    }
+    return new PaystackPaymentProvider(config.paystackSecretKey);
+  }
   // parseEnv already restricts the enum; fail closed if that ever changes.
-  throw new Error(`Unsupported payment provider: ${config.provider}`);
+  throw new Error(`Unsupported payment provider: ${String(config.provider)}`);
 }

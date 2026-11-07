@@ -10,10 +10,16 @@ Implementation agents must not invent answers to these questions.
 | O-02 | Who owns course content and what happens when a creator/instructor leaves? | Affects content rights, continuity and withdrawal. |
 | O-03 | Who can create, review and publish courses? Is approval required? | Defines workflow and permissions. |
 | O-04 | **Resolved (Phase 3):** video, PDF/download, text and quiz launch; audio and assignments do not. | Defines content model and player. See `docs/implementation/phase-3-learning-and-progress.md`. |
-| O-05 | Which payment provider, currencies and payment methods? | Required for order and payment implementation. Paystack is not confirmed. |
+| O-05 | **Partially resolved (Task 1):** Paystack is the confirmed payment provider. Which currencies, payment methods and reconciliation policy? | Provider selection was explicitly requested for Task 1. Currency/payment-method/reconciliation details still require a decision; no additional choices were invented. |
 | O-06 | Android only or Android and iOS? | Changes mobile delivery and offline implementation. |
 | O-07 | What are expected student counts and peak concurrent viewers? | Needed to choose and validate video delivery. |
 | O-08 | What video sizes, resolutions and download limits are expected? | Affects storage, bandwidth and UX. |
+
+**Task 1 decision:** the owner explicitly selected Paystack for the live gateway integration. This
+resolves only the provider portion of O-05. `STORE_CURRENCY=NGN` remains a format-checked
+development placeholder; supported currencies, payment methods, tax/receipts and exact
+reconciliation/refund procedures were not selected and remain Open. See
+`docs/implementation/task-1-paystack-integration.md`.
 
 ## Resolved in Phase 3 (confirmed product decisions)
 
@@ -84,4 +90,4 @@ Resolve O-01, O-03 through O-08 before committing to detailed implementation arc
 - The web player watermark displays signed-in email, short session ID and timestamp. PDF downloads remain checksum-exact; the overlay is a deterrent, not DRM.
 - Phase 4 visual sign-off uses DOM component tests, full typechecking and production build verification. Automated browser screenshots and rendered viewport comparison were **Not run** and must not be claimed.
 
-O-01, O-03, O-05/O-21, O-06/O-07/O-08, O-11, O-15, certificate design/verification, O-22–O-28, session duration/concurrent policy, device identity/reset/reinstall, replacement cooldown, old offline content after replacement, offline expiry, rooted-device policy, download quality/storage/resumability, offline quizzes and delivery-provider/CDN choice remain Open.
+O-01, O-03, O-05 currency/payment-method/reconciliation details, O-21, O-06/O-07/O-08, O-11, O-15, certificate design/verification, O-22–O-28, session duration/concurrent policy, device identity/reset/reinstall, replacement cooldown, old offline content after replacement, offline expiry, rooted-device policy, download quality/storage/resumability, offline quizzes and delivery-provider/CDN choice remain Open. The O-05 payment-provider choice is resolved as Paystack by Task 1.

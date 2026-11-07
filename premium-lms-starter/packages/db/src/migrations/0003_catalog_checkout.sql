@@ -13,7 +13,7 @@ ALTER TABLE users
 
 -- Course pricing. The server is the authority for price at order creation;
 -- clients never supply amounts. Backfill uses the development placeholder
--- currency (see O-05/O-21: provider and currency decisions remain OPEN);
+-- currency (O-21 remains OPEN; Task 1 later selected Paystack as the provider);
 -- application code always supplies the value explicitly.
 ALTER TABLE courses ADD COLUMN price_amount NUMERIC(12, 2);
 ALTER TABLE courses ADD COLUMN price_currency TEXT;

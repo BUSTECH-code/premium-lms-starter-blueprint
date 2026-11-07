@@ -39,10 +39,9 @@ interface CompletionResult {
 }
 
 /**
- * Simulated checkout for the development payment provider (the real gateway
- * decision is open — O-05). Every "payment" builds a signed provider event
- * that runs through the production webhook pipeline — there is no shortcut
- * to access.
+ * Preview checkout remains the local development fallback. Paystack is the
+ * confirmed live provider; this page still runs every payment through the
+ * signed, idempotent verification workflow — there is no shortcut to access.
  */
 export function SimulatedCheckoutPage() {
   const { reference = '' } = useParams();
@@ -58,7 +57,7 @@ export function SimulatedCheckoutPage() {
     setError(null);
     setNotFound(false);
     try {
-      const data = await apiFetch<CheckoutSession>(`/api/simulated/checkout/${reference}`);
+      const data = await apiFetch<CheckoutSession>(`/api/checkout/preview/${reference}`);
       setSession(data);
     } catch (err) {
       if (err instanceof ApiError && err.status === 404) setNotFound(true);
@@ -77,7 +76,7 @@ export function SimulatedCheckoutPage() {
     setError(null);
     try {
       const data = await apiFetch<CompletionResult>(
-        `/api/simulated/checkout/${reference}/complete`,
+        `/api/checkout/preview/${reference}/complete`,
         { method: 'POST', body: JSON.stringify({ outcome }) },
       );
       setResult(data);
@@ -98,7 +97,7 @@ export function SimulatedCheckoutPage() {
         <StatePanel
           kind="loading"
           title="Loading checkout"
-          description="Checking the order and simulated payment state."
+          description="Checking your order and payment status."
           testId="checkout-loading-state"
         >
           <Spinner label="Loading checkout…" />
@@ -117,7 +116,7 @@ export function SimulatedCheckoutPage() {
           testId="checkout-not-found-state"
         >
           <Link className="button secondary" to="/courses">
-            Back to catalogue
+            Back to Course Catalog
           </Link>
         </StatePanel>
       </div>
@@ -142,13 +141,12 @@ export function SimulatedCheckoutPage() {
       data-responsive-layout="stacked-mobile split-tablet grid-desktop"
     >
       <PageIntro
-        eyebrow="Secure checkout · simulated gateway"
-        title="Confirm your enrolment"
+        eyebrow="Secure Checkout"
+        title="Secure Checkout"
         lede={
           <>
-            This environment uses a <strong>simulated payment provider</strong> — no real money
-            moves. The confirmation still travels through the signed webhook pipeline that a real
-            gateway would use.
+            This is a safe checkout preview. No payment is charged. Access is confirmed only after
+            secure payment verification.
           </>
         }
         className="checkout-hero"
@@ -209,8 +207,8 @@ export function SimulatedCheckoutPage() {
             title="Access granted"
             description={
               <>
-                <Badge>Payment confirmed</Badge> Your payment was verified and your enrolment was
-                created. The course is now in your library.
+                <Badge>Payment confirmed</Badge> Your payment was verified and your enrollment was
+                created. The course is now in your Learning Center.
               </>
             }
             testId="checkout-status"
@@ -219,7 +217,7 @@ export function SimulatedCheckoutPage() {
               Open the course
             </Link>
             <Link className="button secondary" to="/">
-              Your courses
+              Learning Center
             </Link>
           </StatePanel>
         ) : quarantined ? (
@@ -231,22 +229,22 @@ export function SimulatedCheckoutPage() {
             testId="checkout-status"
           >
             <Link className="button secondary" to="/">
-              Your orders
+              Learning Center
             </Link>
             <Link className="button ghost" to="/courses">
-              Back to catalogue
+              Back to Course Catalog
             </Link>
           </StatePanel>
         ) : failedNow ? (
           <StatePanel
             kind="error"
             className="checkout-status"
-            title="Payment failed"
-            description="The simulated gateway declined this payment. No access was granted — you can retry below."
+            title="Payment declined"
+            description="The payment was declined. No access was granted — you can try again below."
             testId="checkout-status"
           >
             <Button loading={submitting} onClick={() => void complete('success')}>
-              Retry with a successful payment
+              Try a successful payment again
             </Button>
             <Link className="button ghost" to="/courses">
               Abandon checkout
@@ -257,11 +255,11 @@ export function SimulatedCheckoutPage() {
             kind="expired"
             className="checkout-status"
             title="Checkout expired"
-            description="This checkout is no longer payable. Start again from the catalogue — nothing was charged."
+            description="This checkout is no longer payable. Start again from the Course Catalog — nothing was charged."
             testId="checkout-status"
           >
             <Link className="button secondary" to="/courses">
-              Back to catalogue
+              Back to Course Catalog
             </Link>
           </StatePanel>
         ) : payable ? (
@@ -269,18 +267,18 @@ export function SimulatedCheckoutPage() {
             kind="confirmation"
             className="checkout-status"
             title="Complete your payment"
-            description="Both outcomes exercise the real webhook pipeline: success grants access, failure does not."
+            description="Choose an outcome to confirm access: successful payments grant access; declined payments do not."
             testId="checkout-status"
           >
             <Button loading={submitting} onClick={() => void complete('success')}>
-              Simulate successful payment
+              Confirm successful payment
             </Button>
             <Button
               variant="secondary"
               disabled={submitting}
               onClick={() => void complete('failure')}
             >
-              Simulate failed payment
+              Decline payment
             </Button>
           </StatePanel>
         ) : (
@@ -292,7 +290,7 @@ export function SimulatedCheckoutPage() {
             testId="checkout-status"
           >
             <Link className="button secondary" to="/">
-              Your orders
+              Learning Center
             </Link>
           </StatePanel>
         )}

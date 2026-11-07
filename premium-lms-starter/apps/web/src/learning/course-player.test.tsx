@@ -178,7 +178,7 @@ describe('CoursePlayerPage', () => {
     expect(await screen.findByRole('heading', { name: 'Checkpoint' })).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Mark complete' })).toBeNull();
     expect(document.body.innerHTML).not.toContain('isCorrect');
-    expect(screen.getByText(/Pass mark 80%/)).toBeTruthy();
+    expect(screen.getByText(/Passing score 80%/)).toBeTruthy();
 
     // First attempt: all wrong → 0%, no completion.
     fireEvent.click(screen.getByLabelText('Not started'));

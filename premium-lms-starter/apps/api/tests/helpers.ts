@@ -7,6 +7,9 @@ import { createLogger } from '../src/lib/logger.js';
 
 export const TEST_JWT_SECRET = 'unit-test-secret-at-least-32-characters-long!!';
 export const TEST_MEDIA_SIGNING_SECRET = 'unit-test-media-signing-secret-at-least-32-chars!!';
+/** Clearly fake Paystack test keys. No real credential or live HTTP call is used. */
+export const TEST_PAYSTACK_SECRET_KEY = 'sk_test_lms_unit_test_secret_key';
+export const TEST_PAYSTACK_PUBLIC_KEY = 'pk_test_lms_unit_test_public_key';
 
 export interface TestApp {
   app: Express;
@@ -29,6 +32,12 @@ export async function createTestApp(overrides: Record<string, string> = {}): Pro
     RATE_LIMIT_MEDIA_GRANT_MAX_ATTEMPTS: '1000',
     RATE_LIMIT_MEDIA_CONTENT_MAX_ATTEMPTS: '1000',
     ...(productionLike ? { MEDIA_SIGNING_SECRET: TEST_MEDIA_SIGNING_SECRET } : {}),
+    ...(overrides.PAYMENT_PROVIDER === 'paystack'
+      ? {
+          PAYSTACK_SECRET_KEY: TEST_PAYSTACK_SECRET_KEY,
+          PAYSTACK_PUBLIC_KEY: TEST_PAYSTACK_PUBLIC_KEY,
+        }
+      : {}),
     ...overrides,
   });
   const db = await createDatabase({ driver: 'pglite', path: 'memory:' });

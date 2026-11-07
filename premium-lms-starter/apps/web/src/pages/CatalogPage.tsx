@@ -88,7 +88,7 @@ export function CatalogPage() {
         if (!cancelled) setItems(firstPage);
       } catch (err) {
         if (!cancelled) {
-          setError(err instanceof ApiError ? err.message : 'Could not load the catalogue.');
+          setError(err instanceof ApiError ? err.message : 'Could not load the Course Catalog.');
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -148,13 +148,13 @@ export function CatalogPage() {
       data-responsive-layout="stacked-mobile split-tablet grid-desktop"
     >
       <PageIntro
-        eyebrow="Course catalogue"
+        eyebrow="Course Catalog"
         title="Learn with intent"
         lede="Browse every published course. Search by title, instructor or tag, or narrow the list by category."
         testId="catalog-hero"
         aside={
           <div className="catalogue-principles" data-testid="catalogue-principles">
-            <p className="section-label">This catalogue</p>
+            <p className="section-label">Course Catalog</p>
             <p className="muted">
               Published courses only, with real instructors, lesson counts, durations and prices.
             </p>
@@ -231,7 +231,7 @@ export function CatalogPage() {
       {error ? (
         <StatePanel
           kind="error"
-          title="Catalogue unavailable"
+          title="Course Catalog unavailable"
           description={error}
           testId="catalog-error-state"
         />
@@ -241,7 +241,7 @@ export function CatalogPage() {
         <StatePanel
           kind="loading"
           title="Loading courses"
-          description="Fetching published courses from the catalogue."
+          description="Fetching published courses from the Course Catalog."
           testId="catalog-loading-state"
         >
           <Spinner label="Loading courses…" />
