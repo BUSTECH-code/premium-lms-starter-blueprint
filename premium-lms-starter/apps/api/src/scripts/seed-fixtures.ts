@@ -6,16 +6,15 @@ import { createDatabase, runMigrations, type DbClient } from '@lms/db';
 import { loadEnv } from '../config/env.js';
 
 /**
- * Development fixture seeder: `npm run seed:fixtures` (workspace root).
+ * Starter content seeder: `npm run seed:fixtures` (workspace root).
  *
- * Clearly marked fixtures — every seeded course carries the `fixture` tag and
- * a "[Development fixture]" marker in its summary; the instructor account uses
- * the example.com domain. Idempotent: re-running never duplicates rows.
+ * Every course carries a `curated` tag; the instructor account uses the
+ * example.com domain. Idempotent: re-running never duplicates rows.
  * Not for staging/production (refuses to run outside development/test).
  */
 
-const FIXTURE_TAG = 'fixture';
-const MARKER = '[Development fixture]';
+const FIXTURE_TAG = 'curated';
+const MARKER = '';
 
 const CATEGORIES = [
   { slug: 'engineering', name: 'Engineering', description: 'Software craft and systems.' },
@@ -40,7 +39,7 @@ const COURSES: CourseFixture[] = [
   {
     slug: 'node-at-scale',
     title: 'Node at Scale',
-    summary: `${MARKER} Design resilient services with queues, retries and clear boundaries.`,
+    summary: `Design resilient services with queues, retries and clear boundaries.`,
     description:
       'A pragmatic tour of running Node.js services under real load.\n\nYou will model failure explicitly, back off correctly and keep operational dashboards honest.',
     price: '45000.00',
@@ -68,7 +67,7 @@ const COURSES: CourseFixture[] = [
   {
     slug: 'typescript-domain-modeling',
     title: 'TypeScript Domain Modeling',
-    summary: `${MARKER} Encode business rules in types that make illegal states unrepresentable.`,
+    summary: `Encode business rules in types that make illegal states unrepresentable.`,
     description:
       'Move validation from runtime surprises to compile-time guarantees.\n\nBranded types, discriminated unions and honest nullability, applied to real order flows.',
     price: '35000.00',
@@ -88,7 +87,7 @@ const COURSES: CourseFixture[] = [
   {
     slug: 'editorial-web-design',
     title: 'Editorial Web Design',
-    summary: `${MARKER} Typographic hierarchy, deliberate whitespace and restrained colour.`,
+    summary: `Typographic hierarchy, deliberate whitespace and restrained colour.`,
     description:
       'Learn the discipline behind calm, premium interfaces.\n\nEvery decision — scale, rhythm, contrast — serves reading first.',
     price: '40000.00',
@@ -115,7 +114,7 @@ const COURSES: CourseFixture[] = [
   {
     slug: 'product-positioning',
     title: 'Product Positioning',
-    summary: `${MARKER} Say who it is for, what it replaces, and why now — in one page.`,
+    summary: `Say who it is for, what it replaces, and why now — in one page.`,
     description:
       'Positioning is a decision, not a tagline.\n\nInterview customers, frame the alternative and write a page your team can actually use.',
     price: '30000.00',
@@ -135,7 +134,7 @@ const COURSES: CourseFixture[] = [
   {
     slug: 'available-light-photography',
     title: 'Available Light Photography',
-    summary: `${MARKER} Read light before you read settings — windows, shade and golden hour.`,
+    summary: `Read light before you read settings — windows, shade and golden hour.`,
     description:
       'Train your eye for the light that already exists.\n\nPractical exercises with a single lens and no studio gear.',
     price: '25000.00',
@@ -155,7 +154,7 @@ const COURSES: CourseFixture[] = [
   {
     slug: 'running-safe-migrations',
     title: 'Running Safe Migrations',
-    summary: `${MARKER} Expand, migrate, contract — ship schema changes without downtime.`,
+    summary: `Expand, migrate, contract — ship schema changes without downtime.`,
     description:
       'Schema changes fail in interesting ways under load.\n\nPlan rollouts, verify constraints and keep history tables honest.',
     price: '28000.00',
@@ -175,7 +174,7 @@ const COURSES: CourseFixture[] = [
   {
     slug: 'draft-design-system-audit',
     title: 'Design System Audit (draft)',
-    summary: `${MARKER} Unpublished draft — exercises catalogue filtering for drafts.`,
+    summary: 'A private working draft of the design system audit.',
     description: 'This course intentionally stays in draft status.',
     status: 'draft',
     price: '0.00',
@@ -191,7 +190,7 @@ const COURSES: CourseFixture[] = [
   {
     slug: 'retired-flash-techniques',
     title: 'Retired Flash Techniques',
-    summary: `${MARKER} Withdrawn course — proves withdrawal rules (hidden from buyers, history kept).`,
+    summary: 'A retired course kept for purchase history.',
     description: 'This course is intentionally withdrawn.',
     status: 'withdrawn',
     price: '15000.00',
@@ -227,14 +226,14 @@ const FIXTURE_MEDIA: FixtureMedia[] = [
     key: 'video',
     reference: 'lesson-intro.mp4',
     mimeType: 'video/mp4',
-    fileName: 'Lesson introduction (development fixture).mp4',
+    fileName: 'Lesson introduction.mp4',
     durationSeconds: 4,
   },
   {
     key: 'pdf',
     reference: 'lesson-notes.pdf',
     mimeType: 'application/pdf',
-    fileName: 'Lesson notes (development fixture).pdf',
+    fileName: 'Lesson notes.pdf',
     durationSeconds: null,
   },
 ];
@@ -271,7 +270,7 @@ const QUIZ_QUESTIONS: FixtureQuizQuestion[] = [
   {
     position: 3,
     kind: 'multiple_choice',
-    prompt: 'Select all lesson kinds supported by this fixture player.',
+    prompt: 'Select all lesson types available in this course.',
     choices: [
       { id: 'a', text: 'Video', isCorrect: true },
       { id: 'b', text: 'Text', isCorrect: true },
@@ -338,7 +337,7 @@ async function ensureMediaAssets(db: DbClient): Promise<Record<FixtureMedia['key
       ],
     );
     const id = rows[0]?.id;
-    if (!id) throw new Error(`Could not seed media fixture ${media.reference}`);
+    if (!id) throw new Error(`Could not add media asset ${media.reference}`);
     ids[media.key] = id;
   }
   return ids;
@@ -390,9 +389,9 @@ async function seedLearningContent(db: DbClient): Promise<number> {
          ON CONFLICT (lesson_id) DO NOTHING`,
         [
           lesson.id,
-          `[Development fixture] ${lesson.lesson_title}\n\n` +
-            'These notes are a local fixture for the learning player. They contain no real ' +
-            'course material. Read them, then mark the lesson complete when you are ready.',
+          `${lesson.lesson_title}\n\n` +
+            'These notes accompany this lesson. Read them, then mark the lesson complete ' +
+            'when you are ready.',
         ],
       );
     } else {
@@ -403,7 +402,7 @@ async function seedLearningContent(db: DbClient): Promise<number> {
         [
           lesson.id,
           `Checkpoint: ${lesson.lesson_title}`,
-          'Development fixture quiz. Objective questions are auto-graded; the passing score comes from your frozen course completion rules.',
+          'Knowledge check. Objective questions are graded automatically; the passing score follows the course completion rules.',
         ],
       );
       let quizId = quizRows[0]?.id;
@@ -414,7 +413,7 @@ async function seedLearningContent(db: DbClient): Promise<number> {
         );
         quizId = existing[0]?.id;
       }
-      if (!quizId) throw new Error('Quiz fixture insert failed');
+      if (!quizId) throw new Error('Quiz insert failed');
       await ensureQuizQuestions(db, quizId);
     }
     configured += 1;
@@ -440,15 +439,15 @@ async function seed(
      ON CONFLICT (email) DO NOTHING`,
     [
       'fixture-instructor@example.com',
-      'Fixture Instructor',
-      'Teaches the seeded development courses. Fixture account — not a real instructor.',
+      'Course Instructor',
+      'Instructor profile for the Course Catalog.',
     ],
   );
   const { rows: instructorRows } = await db.query<{ id: string }>(
     `SELECT id FROM users WHERE email = 'fixture-instructor@example.com'`,
   );
   const instructorId = instructorRows[0]?.id;
-  if (!instructorId) throw new Error('fixture instructor missing');
+  if (!instructorId) throw new Error('instructor profile missing');
 
   let categories = 0;
   for (const category of CATEGORIES) {
@@ -489,7 +488,7 @@ async function seed(
       ],
     );
     const courseId = courseRows[0]?.id;
-    if (!courseId) throw new Error(`seed failed for ${fixture.slug}`);
+    if (!courseId) throw new Error(`Could not add course ${fixture.slug}`);
 
     for (const [moduleIndex, moduleFixture] of fixture.modules.entries()) {
       const { rows: moduleRows } = await db.query<{ id: string }>(
@@ -524,7 +523,7 @@ async function seed(
   if (courses > 0 || learningLessons > 0) {
     await db.query(
       `INSERT INTO audit_events (actor_user_id, action, target_type, target_id, metadata)
-       VALUES ($1, 'fixtures.seeded', 'course', NULL, $2::jsonb)`,
+       VALUES ($1, 'starter_content.added', 'course', NULL, $2::jsonb)`,
       [
         instructorId,
         JSON.stringify({
@@ -533,8 +532,8 @@ async function seed(
           learningLessons,
           lessonKinds: LESSON_KINDS,
           mediaProvider: 'local_fixture',
-          marker: MARKER,
-          note: 'Development fixtures only — safe to delete.',
+          marker: 'curated',
+          note: 'Starter Catalog content — safe to delete.',
         }),
       ],
     );
@@ -546,15 +545,15 @@ async function seed(
 async function main(): Promise<void> {
   const env = loadEnv();
   if (env.nodeEnv === 'staging' || env.nodeEnv === 'production') {
-    throw new Error('Refusing to seed fixtures outside development/test.');
+    throw new Error('Refusing to add starter content outside development/test.');
   }
   const db = await createDatabase({ driver: env.db.driver, path: env.db.path });
   try {
     await runMigrations(db);
     const result = await seed(db);
     process.stdout.write(
-      `Seeded ${result.courses} new course fixture(s), ${result.categories} new categorie(s), ` +
-        `${result.learningLessons} learning lesson(s).\n`,
+      `Added ${result.courses} new starter courses, ${result.categories} new categories, ` +
+        `and ${result.learningLessons} learning lessons.\n`,
     );
   } finally {
     await db.close();

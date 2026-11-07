@@ -34,14 +34,20 @@ const rawSchema = z.object({
   RATE_LIMIT_REGISTER_MAX_ATTEMPTS: z.coerce.number().int().min(1).max(100_000).default(10),
   RATE_LIMIT_REGISTER_WINDOW_SECONDS: z.coerce.number().int().min(1).max(86_400).default(3600),
   // --- Phase 2: catalogue & commerce ---------------------------------------
-  // Currency is an OPEN decision (O-05/O-21); NGN is a development placeholder.
+  // Currency remains an OPEN decision (O-21); NGN is a development placeholder.
   STORE_CURRENCY: z.string().default('NGN'),
-  // The real payment provider is an OPEN decision (O-05). 'simulated' is the
-  // only supported value until a provider is approved; production-like
-  // environments must opt in explicitly with ALLOW_SIMULATED_PAYMENTS=true.
-  PAYMENT_PROVIDER: z.enum(['simulated']).default('simulated'),
+  // Paystack is the confirmed live provider; 'simulated' remains for local
+  // development and tests. Production-like envs require live Paystack keys.
+  PAYMENT_PROVIDER: z.enum(['simulated', 'paystack']).default('simulated'),
   ALLOW_SIMULATED_PAYMENTS: z.enum(['true', 'false']).default('false'),
   SIMULATED_WEBHOOK_SECRET: z.string().optional(),
+  // --- Task 1: live Paystack integration ------------------------------------
+  // Secret key is server-only. Public key is safe to expose to the browser;
+  // VITE_PAYSTACK_PUBLIC_KEY is the browser-facing copy of that same value.
+  PAYSTACK_SECRET_KEY: z.string().optional(),
+  PAYSTACK_PUBLIC_KEY: z.string().optional(),
+  PAYSTACK_API_BASE_URL: z.string().url().default('https://api.paystack.co'),
+  PAYSTACK_CALLBACK_URL: z.string().url().optional(),
   // Abandoned-checkout deadline for pending orders.
   CHECKOUT_TTL_MINUTES: z.coerce.number().int().min(1).max(1440).default(30),
   RATE_LIMIT_CHECKOUT_MAX_ATTEMPTS: z.coerce.number().int().min(1).max(100_000).default(30),
@@ -93,13 +99,23 @@ export interface Env {
     signingSecret: string;
   };
   commerce: {
-    /** Store currency (placeholder pending O-05/O-21). */
+    /** Store currency (placeholder pending O-21). */
     currency: string;
-    provider: 'simulated';
+    provider: 'simulated' | 'paystack';
     /** True when simulated checkout/webhook endpoints are mounted. */
     simulationEnabled: boolean;
     webhookSecret: string;
     checkoutTtlMinutes: number;
+  };
+  paystack: {
+    enabled: boolean;
+    /** HMAC/API credential; never exposed to the browser or client config. */
+    secretKey: string;
+    /** Public browser key; duplicated as VITE_PAYSTACK_PUBLIC_KEY on the web. */
+    publicKey: string;
+    apiBaseUrl: string;
+    /** Server-owned callback origin; clients may never supply a redirect URL. */
+    callbackUrl: string;
   };
   logLevel: 'fatal' | 'error' | 'warn' | 'info' | 'debug' | 'trace' | 'silent';
 }
@@ -114,6 +130,23 @@ const WEAK_SECRET_EXACT = new Set([
   'dev-secret',
   'example-secret',
 ]);
+
+const PAYSTACK_KEY_PATTERN = /^(sk|pk)_(test|live)_[A-Za-z0-9_-]{8,}$/;
+
+/** Return the Paystack key mode, or null when the value is not a valid key. */
+function paystackKeyMode(value: string, prefix: 'sk' | 'pk'): 'test' | 'live' | null {
+  const match = PAYSTACK_KEY_PATTERN.exec(value);
+  if (!match || match[1] !== prefix) return null;
+  return match[2] === 'live' ? 'live' : 'test';
+}
+
+function looksLikePlaceholder(value: string): boolean {
+  const lower = value.toLowerCase();
+  return (
+    WEAK_SECRET_EXACT.has(lower) ||
+    WEAK_SECRET_MARKERS.some((marker) => lower.includes(marker))
+  );
+}
 
 /**
  * Local-development fallback only. Production-like environments must supply a
@@ -255,6 +288,87 @@ export function parseEnv(input: Record<string, string | undefined>): Env {
     webhookSecret = randomBytes(48).toString('base64url');
   }
 
+  // --- Paystack (Task 1) ----------------------------------------------------
+  const paystackEnabled = raw.PAYMENT_PROVIDER === 'paystack';
+  const paystackSecretKey = raw.PAYSTACK_SECRET_KEY?.trim() ?? '';
+  const paystackPublicKey = raw.PAYSTACK_PUBLIC_KEY?.trim() ?? '';
+  const paystackApiBaseUrl = raw.PAYSTACK_API_BASE_URL.replace(/\/+$/, '');
+  const primaryOrigin = (allowedOrigins[0] ?? '').replace(/\/+$/, '');
+  const paystackCallbackUrl =
+    raw.PAYSTACK_CALLBACK_URL?.trim() || `${primaryOrigin}/checkout/paystack/callback`;
+
+  if (paystackEnabled) {
+    if (!paystackSecretKey) {
+      throw new EnvironmentError('PAYSTACK_SECRET_KEY is required when PAYMENT_PROVIDER=paystack.');
+    }
+    if (!paystackPublicKey) {
+      throw new EnvironmentError('PAYSTACK_PUBLIC_KEY is required when PAYMENT_PROVIDER=paystack.');
+    }
+    const secretMode = paystackKeyMode(paystackSecretKey, 'sk');
+    const publicMode = paystackKeyMode(paystackPublicKey, 'pk');
+    if (!secretMode || looksLikePlaceholder(paystackSecretKey)) {
+      throw new EnvironmentError('PAYSTACK_SECRET_KEY must be a valid, non-placeholder sk_test_ or sk_live_ key.');
+    }
+    if (!publicMode || looksLikePlaceholder(paystackPublicKey)) {
+      throw new EnvironmentError('PAYSTACK_PUBLIC_KEY must be a valid, non-placeholder pk_test_ or pk_live_ key.');
+    }
+    if (secretMode !== publicMode) {
+      throw new EnvironmentError('PAYSTACK_SECRET_KEY and PAYSTACK_PUBLIC_KEY must use the same test/live mode.');
+    }
+    if (isProductionLike && secretMode !== 'live') {
+      throw new EnvironmentError('Live sk_live_/pk_live_ Paystack keys are required in staging/production.');
+    }
+  }
+
+  let apiUrl: URL;
+  try {
+    apiUrl = new URL(paystackApiBaseUrl);
+  } catch {
+    throw new EnvironmentError('PAYSTACK_API_BASE_URL must be a valid URL.');
+  }
+  if (
+    apiUrl.username ||
+    apiUrl.password ||
+    apiUrl.search ||
+    apiUrl.hash ||
+    (apiUrl.pathname !== '/' && apiUrl.pathname !== '')
+  ) {
+    throw new EnvironmentError('PAYSTACK_API_BASE_URL must be a bare HTTPS origin.');
+  }
+  if (paystackEnabled && isProductionLike && apiUrl.origin !== 'https://api.paystack.co') {
+    throw new EnvironmentError('PAYSTACK_API_BASE_URL must be https://api.paystack.co in staging/production.');
+  }
+  if (paystackEnabled && apiUrl.protocol !== 'https:') {
+    const localHost = apiUrl.hostname === 'localhost' || apiUrl.hostname === '127.0.0.1';
+    if (!localHost) {
+      throw new EnvironmentError('PAYSTACK_API_BASE_URL must use HTTPS outside local development.');
+    }
+  }
+
+  let callbackUrl: URL;
+  try {
+    callbackUrl = new URL(paystackCallbackUrl);
+  } catch {
+    throw new EnvironmentError('PAYSTACK_CALLBACK_URL must be a valid URL.');
+  }
+  if (
+    callbackUrl.username ||
+    callbackUrl.password ||
+    callbackUrl.search ||
+    callbackUrl.hash ||
+    callbackUrl.pathname !== '/checkout/paystack/callback'
+  ) {
+    throw new EnvironmentError(
+      'PAYSTACK_CALLBACK_URL must be a bare origin with the /checkout/paystack/callback path.',
+    );
+  }
+  if (paystackEnabled && !allowedOrigins.includes(callbackUrl.origin)) {
+    throw new EnvironmentError('PAYSTACK_CALLBACK_URL must use one of the configured WEB_ORIGIN values.');
+  }
+  if (paystackEnabled && isProductionLike && callbackUrl.protocol !== 'https:') {
+    throw new EnvironmentError('PAYSTACK_CALLBACK_URL must use HTTPS in staging/production.');
+  }
+
   // --- Signed media delivery (Phase 4) -------------------------------------
   let mediaSigningSecret = raw.MEDIA_SIGNING_SECRET?.trim() || undefined;
   if (isProductionLike) {
@@ -321,6 +435,13 @@ export function parseEnv(input: Record<string, string | undefined>): Env {
       simulationEnabled,
       webhookSecret,
       checkoutTtlMinutes: raw.CHECKOUT_TTL_MINUTES,
+    }),
+    paystack: Object.freeze({
+      enabled: paystackEnabled,
+      secretKey: paystackSecretKey,
+      publicKey: paystackPublicKey,
+      apiBaseUrl: paystackApiBaseUrl,
+      callbackUrl: paystackCallbackUrl,
     }),
     logLevel: raw.LOG_LEVEL,
   });

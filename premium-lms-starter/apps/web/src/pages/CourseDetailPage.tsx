@@ -4,6 +4,7 @@ import { ApiError, apiFetch } from '../auth/api.js';
 import { useAuth } from '../auth/AuthProvider.js';
 import { CourseCover, PageIntro, StatePanel } from '../components/editorial.js';
 import { Badge, Button, Spinner } from '../components/ui.js';
+import { isPaystackEnabled } from '../config/paystack.js';
 import { formatDuration, formatPrice } from '../lib/format.js';
 
 interface CurriculumModule {
@@ -38,9 +39,10 @@ interface CourseDetail {
 }
 
 /**
- * Public course landing page. Purchase starts an order via the API and hands
- * off to simulated checkout; entitled learners are routed to the player.
- * Withdrawn courses never show a buy button.
+ * Public course landing page. Purchase starts the configured checkout flow:
+ * Paystack when the public browser key is present, otherwise the local
+ * simulated checkout. Entitled learners are routed to the player; withdrawn
+ * courses never show a buy button.
  */
 export function CourseDetailPage() {
   const { slug = '' } = useParams();
@@ -76,6 +78,12 @@ export function CourseDetailPage() {
     setPurchasing(true);
     setError(null);
     try {
+      // The Paystack view initialises the transaction itself; the course slug is
+      // only a selector. Price, email, callback and redirect stay server-owned.
+      if (isPaystackEnabled()) {
+        navigate(`/checkout/paystack?courseSlug=${encodeURIComponent(slug)}`);
+        return;
+      }
       const result = await apiFetch<{
         order: { id: string };
         payment: { providerReference: string } | null;
@@ -130,7 +138,7 @@ export function CourseDetailPage() {
           testId="course-not-found-state"
         >
           <Link className="button secondary" to="/courses">
-            Back to catalogue
+            Back to Course Catalog
           </Link>
         </StatePanel>
       </div>
@@ -153,7 +161,7 @@ export function CourseDetailPage() {
       data-responsive-layout="stacked-mobile split-tablet grid-desktop"
     >
       <nav className="breadcrumbs" aria-label="Breadcrumb" data-testid="course-breadcrumbs">
-        <Link to="/courses">Catalogue</Link>
+        <Link to="/courses">Course Catalog</Link>
         <span aria-hidden="true"> / </span>
         <span>{course.title}</span>
       </nav>
@@ -295,7 +303,7 @@ export function CourseDetailPage() {
           aria-label="Purchase"
           data-testid="purchase-card"
         >
-          <p className="section-label">One-time enrolment</p>
+          <p className="section-label">One-time enrollment</p>
           <p className="price">{formatPrice(course.price.amount, course.price.currency)}</p>
           <dl className="detail-grid">
             <div>

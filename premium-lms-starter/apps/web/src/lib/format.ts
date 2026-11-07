@@ -14,7 +14,7 @@ export function formatPrice(amount: string, currency: string): string {
       minimumFractionDigits: Number.isInteger(value) ? 2 : undefined,
     }).format(value);
   } catch {
-    // Unknown currency codes (placeholders while O-05/O-21 are open).
+    // Unknown currency codes (placeholder while O-21 remains open).
     return `${value.toFixed(2)} ${currency}`;
   }
 }

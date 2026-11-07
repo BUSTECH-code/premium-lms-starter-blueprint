@@ -4,6 +4,8 @@ import { defineConfig } from 'vitest/config';
 const rootDir = fileURLToPath(new URL('.', import.meta.url));
 
 export default defineConfig({
+  // Load the same root .env.test VITE_* values the browser build sees.
+  envDir: rootDir,
   resolve: {
     alias: {
       // Tests run against package source; compiled dist is only used by the

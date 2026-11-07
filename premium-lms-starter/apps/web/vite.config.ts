@@ -5,6 +5,7 @@ import { defineConfig } from 'vite';
 const sharedSource = fileURLToPath(
   new URL('../../packages/shared/src/index.ts', import.meta.url),
 );
+const workspaceRoot = fileURLToPath(new URL('../../', import.meta.url));
 
 // Dev server configuration.
 // - `host: true` + `allowedHosts: true` so the sandbox preview host can reach it.
@@ -12,6 +13,9 @@ const sharedSource = fileURLToPath(
 // - `xfwd: true` forwards X-Forwarded-* so the API origin check can recognise
 //   requests that arrived through this proxy.
 export default defineConfig({
+  // Root .env.<mode> files hold VITE_* browser config; the web app is launched
+  // from apps/web, so point Vite at the workspace root to find them.
+  envDir: workspaceRoot,
   plugins: [react()],
   resolve: {
     alias: {

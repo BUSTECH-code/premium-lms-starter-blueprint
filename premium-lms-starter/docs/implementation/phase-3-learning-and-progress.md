@@ -24,7 +24,7 @@ idempotent `npm run seed:fixtures` all pass. See "Verification evidence".
 These decisions resolve O-04 (launch lesson types), O-09 (completion criteria) and O-10 (quiz
 passing score / retakes / attempt review) for the implemented Phase 3 scope. O-11 assignment
 approval, O-15 notes/bookmarks/resume-detail decisions, O-03 authoring/publishing authority,
-O-05/O-21 payment/currency detail, and certificate design/verification remain open. The player
+O-05 currency/payment-method/reconciliation detail and O-21 currency detail, and certificate design/verification remain open. The player
 stores a reliable playback position and offers an explicit "Resume from …" action; auto-resume,
 notes and bookmarks are **not** silently invented.
 
@@ -145,7 +145,7 @@ Commands were run from `/home/user/premium-lms-starter-blueprint/premium-lms-sta
 - **Private Google Drive adapter:** Not implemented; no credentials/file IDs are available. Only the
   approved `local_fixture` provider and a documented `MediaProvider` seam are present.
 - **Still-open decisions:** O-11 assignments, O-15 notes/bookmarks/resume details, O-03
-  authoring/publishing authority, O-05/O-21 payment/currency details, O-34 hosting, certificate
+  authoring/publishing authority, O-05 currency/payment-method/reconciliation details, O-34 hosting, certificate
   design/verification, exact design tokens and mobile/offline device rules.
 
 ## 4. Completion report

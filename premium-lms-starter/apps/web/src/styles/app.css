@@ -57,7 +57,7 @@ code {
   background: var(--color-paper);
   border: 1px solid var(--color-line);
   border-radius: var(--radius-sm);
-  padding: 0.05em 0.35em;
+  padding: var(--space-1) var(--space-2);
 }
 
 :focus-visible {
@@ -112,7 +112,7 @@ code {
 .brand span {
   color: var(--color-accent);
   font-style: italic;
-  margin-left: 0.3em;
+  margin-left: var(--space-1);
 }
 
 .app-header nav {
@@ -243,7 +243,7 @@ code {
 
 .field input {
   font: inherit;
-  padding: 0.55rem 0.7rem;
+  padding: var(--space-2) var(--space-3);
   border: 1px solid var(--color-line);
   border-radius: var(--radius-sm);
   background: var(--color-surface);
@@ -290,7 +290,7 @@ code {
   font: inherit;
   font-size: var(--font-size-sm);
   font-weight: 600;
-  padding: 0.55rem 1.1rem;
+  padding: var(--space-2) var(--space-4);
   border-radius: var(--radius-sm);
   border: 1px solid transparent;
   cursor: pointer;
@@ -417,7 +417,7 @@ code {
   display: inline-block;
   font-size: var(--font-size-xs);
   font-weight: 600;
-  padding: 0.15rem 0.5rem;
+  padding: var(--space-1) var(--space-2);
   border-radius: 999px;
   background: var(--color-accent-soft);
   color: var(--color-accent);
@@ -519,7 +519,7 @@ tbody tr:last-child td {
 
 /* ------------------------------------------------------------------ responsive */
 
-@media (max-width: 720px) {
+@media (max-width: 899px) {
   .app-header {
     flex-wrap: wrap;
     gap: var(--space-3);
@@ -816,7 +816,7 @@ tbody tr:last-child td {
   color: var(--color-accent);
 }
 
-@media (max-width: 52rem) {
+@media (max-width: 899px) {
   .detail-layout {
     grid-template-columns: 1fr;
   }
@@ -1096,7 +1096,7 @@ tbody tr:last-child td {
 }
 
 .quiz-choice input {
-  margin-top: 0.2rem;
+  margin-top: var(--space-1);
   flex-shrink: 0;
 }
 
@@ -1270,7 +1270,7 @@ tbody tr:last-child td {
 
 .lesson-lock-hint {
   flex-basis: 100%;
-  padding-left: 2rem;
+  padding-left: var(--space-6);
   font-size: var(--font-size-xs);
 }
 
@@ -1300,7 +1300,7 @@ tbody tr:last-child td {
   padding: var(--space-2) 0;
 }
 
-@media (max-width: 60rem) {
+@media (max-width: 899px) {
   .player-layout {
     grid-template-columns: 1fr;
   }
@@ -1315,7 +1315,7 @@ tbody tr:last-child td {
   }
 }
 
-@media (max-width: 40rem) {
+@media (max-width: 639px) {
   .player-header {
     flex-direction: column;
     align-items: flex-start;
@@ -1353,6 +1353,6 @@ tbody tr:last-child td {
   }
 
   .lesson-state {
-    margin-left: 1.5rem;
+    margin-left: var(--space-5);
   }
 }

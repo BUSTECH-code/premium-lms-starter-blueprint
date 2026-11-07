@@ -60,3 +60,19 @@ State coverage is shared: loading, empty, error, success, disabled, validation, 
 Approved Phase 4 sign-off relies on **DOM component tests, full typechecking and production build verification**. `apps/web/src/styles/design-system.test.ts` checks token confirmation, raw-colour containment, responsive breakpoints and stylesheet order; page/component tests assert shared layout hooks and states.
 
 Automated browser screenshot testing, rendered viewport comparison and reference-image side-by-side inspection were **Not run**. No screenshot locations or viewport captures are claimed. Browser viewports/screenshots must be reported as **Not run** in the Phase 4 completion report.
+
+
+## Task 2 polish and accessibility regression (2026-11-07)
+
+- Legacy `app.css` breakpoints at 720px/52rem/60rem/40rem were reconciled to the confirmed
+  `max-width: 899px` and `max-width: 639px` bands; `phase4.css` retains all five confirmed bands.
+- Remaining raw spacing declarations for buttons, fields, pills and small offsets now use the
+  confirmed `--space-*` scale; typography continues to use `--font-*` tokens.
+- The app shell now exposes explicit `banner` and `contentinfo` roles, a `Primary navigation`
+  label, a `Skip to main content` link and a visible `:focus-visible` outline.
+- `apps/web/src/styles/final-polish.test.tsx` checks WCAG AA contrast for ten confirmed
+  text/background token pairs (all >= 4.5:1), responsive layout hooks for the six named views,
+  five CSS bands, reduced motion, landmarks, first-focus skip-link order, accessible names and
+  keyboard reachability.
+- Automated browser screenshots and rendered viewport comparison remain **Not run**; DOM/CSS tests
+  are not a substitute for visual inspection. Commercial sign-off is limited to automated gates.

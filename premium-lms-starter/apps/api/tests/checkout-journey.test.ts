@@ -65,18 +65,18 @@ describe('purchase & enrolment journey', () => {
     expect(order.body.order.totalAmount).toBe('25000.00');
     expect(order.body.payment.status).toBe('initiated');
     expect(order.body.payment.provider).toBe('simulated');
-    expect(order.body.checkoutUrl).toBe(`/checkout/simulated/${order.body.payment.providerReference}`);
+    expect(order.body.checkoutUrl).toBe(`/checkout/preview/${order.body.payment.providerReference}`);
     const reference = order.body.payment.providerReference as string;
 
     // 5. Inspect the checkout session.
-    const session = await api(test.app, learnerJar).get(`/api/simulated/checkout/${reference}`);
+    const session = await api(test.app, learnerJar).get(`/api/checkout/preview/${reference}`);
     expect(session.status).toBe(200);
     expect(session.body.payable).toBe(true);
     expect(session.body.expired).toBe(false);
 
     // 6. Pay (simulated gateway result → signed webhook event → pipeline).
     const paid = await api(test.app, learnerJar)
-      .post(`/api/simulated/checkout/${reference}/complete`)
+      .post(`/api/checkout/preview/${reference}/complete`)
       .send({ outcome: 'success' });
     expect(paid.status).toBe(200);
     expect(paid.body.status).toBe('processed');
@@ -109,7 +109,7 @@ describe('purchase & enrolment journey', () => {
 
     // 10. Re-paying the same checkout is idempotent.
     const replay = await api(test.app, learnerJar)
-      .post(`/api/simulated/checkout/${reference}/complete`)
+      .post(`/api/checkout/preview/${reference}/complete`)
       .send({ outcome: 'success' });
     expect(replay.status).toBe(200);
     expect(replay.body.reason).toBe('already_paid');
@@ -140,7 +140,7 @@ describe('purchase & enrolment journey', () => {
     const reference = order.body.payment.providerReference as string;
 
     const failed = await api(test.app, learnerJar)
-      .post(`/api/simulated/checkout/${reference}/complete`)
+      .post(`/api/checkout/preview/${reference}/complete`)
       .send({ outcome: 'failure' });
     expect(failed.body.status).toBe('processed');
     expect(failed.body.checkout.order.status).toBe('failed');
@@ -152,7 +152,7 @@ describe('purchase & enrolment journey', () => {
 
     // Provider corrects itself: money arrives after the failure event.
     const recovered = await api(test.app, learnerJar)
-      .post(`/api/simulated/checkout/${reference}/complete`)
+      .post(`/api/checkout/preview/${reference}/complete`)
       .send({ outcome: 'success' });
     expect(recovered.body.status).toBe('processed');
     expect(recovered.body.granted).toBe(true);
@@ -174,7 +174,7 @@ describe('purchase & enrolment journey', () => {
 
     // The cancelled session can no longer be paid.
     const late = await api(test.app, learnerJar)
-      .post(`/api/simulated/checkout/${reference}/complete`)
+      .post(`/api/checkout/preview/${reference}/complete`)
       .send({ outcome: 'success' });
     expect(late.status).toBe(409);
     expect(late.body.error.code).toBe('checkout_not_open');
@@ -200,7 +200,7 @@ describe('purchase & enrolment journey', () => {
     );
 
     const expired = await api(test.app, learnerJar)
-      .post(`/api/simulated/checkout/${reference}/complete`)
+      .post(`/api/checkout/preview/${reference}/complete`)
       .send({ outcome: 'success' });
     expect(expired.status).toBe(409);
     expect(expired.body.error.code).toBe('checkout_expired');
@@ -225,7 +225,7 @@ describe('purchase & enrolment journey', () => {
     await test.db.query(`UPDATE courses SET status = 'withdrawn' WHERE slug = $1`, [courseSlug]);
 
     const result = await api(test.app, learnerJar)
-      .post(`/api/simulated/checkout/${reference}/complete`)
+      .post(`/api/checkout/preview/${reference}/complete`)
       .send({ outcome: 'success' });
     expect(result.status).toBe(200);
     expect(result.body.status).toBe('quarantined');
@@ -265,11 +265,11 @@ describe('purchase & enrolment journey', () => {
     const cancel = await api(test.app, stranger.jar).post(`/api/orders/${orderId}/cancel`);
     expect(cancel.status).toBe(404);
 
-    const session = await api(test.app, stranger.jar).get(`/api/simulated/checkout/${reference}`);
+    const session = await api(test.app, stranger.jar).get(`/api/checkout/preview/${reference}`);
     expect(session.status).toBe(404);
 
     const pay = await api(test.app, stranger.jar)
-      .post(`/api/simulated/checkout/${reference}/complete`)
+      .post(`/api/checkout/preview/${reference}/complete`)
       .send({ outcome: 'success' });
     expect(pay.status).toBe(404);
   });
@@ -281,7 +281,7 @@ describe('purchase & enrolment journey', () => {
     expect(
       (
         await api(test.app)
-          .post('/api/simulated/checkout/simulated_x123456/complete')
+          .post('/api/checkout/preview/simulated_x123456/complete')
           .send({ outcome: 'success' })
       ).status,
     ).toBe(401);

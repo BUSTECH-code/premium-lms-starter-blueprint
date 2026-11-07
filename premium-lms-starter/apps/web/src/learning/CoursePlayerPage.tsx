@@ -170,7 +170,7 @@ function Gradebook({ player }: { player: PlayerStateResponse }) {
       )}
       {player.completion.status === 'completed' ? (
         <p className="small-print muted">
-          Course complete. Certificate issuance is not part of this phase.
+          Course complete. Your achievement has been recorded.
         </p>
       ) : null}
     </section>
@@ -497,7 +497,7 @@ export function CoursePlayerPage({ syncDeps }: CoursePlayerPageProps = {}) {
             </Link>
           ) : null}
           <Link className="button secondary" to="/">
-            Your courses
+            Learning Center
           </Link>
         </StatePanel>
       </div>
@@ -537,15 +537,15 @@ export function CoursePlayerPage({ syncDeps }: CoursePlayerPageProps = {}) {
       data-responsive-layout="stacked-mobile split-tablet grid-desktop"
     >
       <nav className="breadcrumbs" aria-label="Breadcrumb" data-testid="player-breadcrumbs">
-        <Link to="/">Your courses</Link>
+        <Link to="/">Learning Center</Link>
         <span aria-hidden="true"> / </span>
         <Link to={`/courses/${player.course.slug}`}>{player.course.title}</Link>
         <span aria-hidden="true"> / </span>
-        <span>Learning</span>
+        <span>Learning Center</span>
       </nav>
 
       <PageIntro
-        eyebrow="Course player"
+        eyebrow="Learning Center"
         title={player.course.title}
         lede={
           player.course.summary ??
@@ -671,7 +671,7 @@ export function CoursePlayerPage({ syncDeps }: CoursePlayerPageProps = {}) {
                   {quiz.instructions ? <p className="muted">{quiz.instructions}</p> : null}
                 </div>
                 <div className="quiz-facts muted">
-                  <span>Pass mark {quiz.passingScorePercent}%</span>
+                  <span>Passing score {quiz.passingScorePercent}%</span>
                   <span>
                     Best {quiz.bestScorePercent === null ? '—' : `${quiz.bestScorePercent}%`} ·{' '}
                     {quiz.attemptCount} attempt{quiz.attemptCount === 1 ? '' : 's'}
